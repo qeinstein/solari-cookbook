@@ -1,0 +1,42 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>AcmeCloud Collections</title>
+<style>
+  body { font: 16px system-ui; max-width: 720px; margin: 40px auto; color: #172033; }
+  section { border: 1px solid #d9dfeb; border-radius: 12px; padding: 20px; margin: 16px 0; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .value { font-size: 24px; font-weight: 700; }
+  button { padding: 10px 14px; margin: 4px; cursor: pointer; }
+  #messages { min-height: 28px; white-space: pre-wrap; }
+</style>
+<h1>AcmeCloud Collections</h1>
+<p>Invoice <strong>INV-1842</strong> · customer: Northstar Labs</p>
+<section class="grid">
+  <div>Payment system<div id="payment" class="value"></div></div>
+  <div>CRM invoice status<div id="crm" class="value"></div></div>
+</section>
+<section>
+  <h2>World controls</h2>
+  <button data-action="pay">Customer pays</button>
+  <button data-action="webhook">Deliver payment webhook</button>
+  <button data-action="reset">Reset world</button>
+</section>
+<section>
+  <h2>Agent wakeup</h2>
+  <button data-action="agent/original">Run original agent</button>
+  <button data-action="agent/fixed">Run fixed agent</button>
+  <p id="messages"></p>
+</section>
+<script>
+  const $ = selector => document.querySelector(selector);
+  async function refresh() {
+    const state = await fetch('/state').then(response => response.json());
+    $('#payment').textContent = state.payment.toUpperCase();
+    $('#crm').textContent = state.crm.toUpperCase();
+    $('#messages').textContent = state.messages.length ? state.messages.join('\n') : 'No messages sent.';
+  }
+  document.querySelectorAll('button').forEach(button => button.onclick = async () => {
+    await fetch('/' + button.dataset.action, {method: 'POST'}); await refresh();
+  });
+  refresh();
+</script>

@@ -1,0 +1,57 @@
+# TimeCapsule
+
+Find the futures where your AI agent fails before your users do.
+
+This example treats the future as a fuzzing surface. It explores possible
+payment/webhook/wakeup timelines, checks a deterministic safety invariant,
+minimizes a failing timeline, and replays the same future against a patched
+agent.
+
+Solari is part of the execution model: every future runs in its own sandbox,
+the sandbox serves an isolated collections app through a preview URL, and a
+separate Solari cloud browser drives the agent-facing UI. Futures can run in
+parallel without sharing world state.
+
+## Run the local proof
+
+No API key is needed for the deterministic local proof:
+
+```bash
+python3 main.py local --futures 25
+python3 -m unittest discover -s tests -v
+```
+
+This finds a delayed-payment failure, reduces it to the payment → wakeup →
+webhook sequence, compares the original and patched agent, and writes a trace
+under `runs/`.
+
+## Run with Solari
+
+```bash
+pip install -r requirements.txt
+export SOLARI_API_KEY=slr_live_...  # https://console.getsolari.com
+python3 main.py solari --futures 3
+```
+
+Each future creates and destroys its own sandbox and browser session. The
+browser session is created with recording enabled; the output includes the
+session IDs and preview URLs needed to inspect a run.
+
+## Dashboard
+
+After a local run:
+
+```bash
+python3 dashboard/server.py --run runs/latest.json
+```
+
+Open `http://127.0.0.1:8766` to inspect the future tree, failure invariant,
+event sequence, replay comparison, and minimization result.
+
+## The failure
+
+The vulnerable agent trusts the CRM. A customer payment changes the payment
+system immediately, but a delayed webhook leaves the CRM showing `OVERDUE`.
+If the agent wakes during that stale window it sends an incorrect collection
+message. The patched agent verifies the payment system before contacting the
+customer.

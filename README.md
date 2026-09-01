@@ -9,6 +9,12 @@ past. Copy one into your project and change the parts you care about.
 
 ## Examples
 
+### TimeCapsule
+
+| Example | Language | What it shows |
+| --- | --- | --- |
+| [timecapsule-py](examples/timecapsule-py) | Python | Explore isolated, branching agent futures with Solari browser + sandbox sessions |
+
 ### Cloud browser
 
 | Example | Language | What it shows |
