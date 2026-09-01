@@ -7,7 +7,9 @@
 TimeCapsule treats the future as a fuzzing surface. It uses coverage-guided
 mutation to explore payment, dispute, webhook, and wakeup timelines, checks a
 safety invariant, binary-searches the failure boundary, minimizes a failing
-timeline, and replays the same future against a patched agent.
+timeline, and replays the same future against a patched agent. A matched
+200-trial benchmark shows a modest breadth benefit for guidance but
+no reliable rare-failure speed advantage; see the [search comparison report](../../benchmarks/timecapsule-search-comparison.md).
 
 This is a real Solari use case, not a decorative integration: cloud sandboxes
 hold isolated worlds, Solari browsers drive the agent-facing UI, and recorded
@@ -141,13 +143,31 @@ incident prevalence.
 
 | Mode | Futures | Candidates | Virtual horizon | Wall clock | Failure rate | Minimized to | Solari environments |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Local coverage search | 25 | 1,400 | 104.25 days | 0.0597s | 80.0% | 37.97% | 0 |
-| Solari browser/sandbox | 3 | 36 | 15.5 days | 141.205s | 66.7% | 40.0% | 5 |
+| Local coverage search | 25 | 1,400 | 116.33 days | 0.1161s | 80.0% | 37.97% | 0 |
+| Solari browser/sandbox | 3 | 36 | 15.5 days | 141.8757s | 66.7% | 40.0% | 5 |
 
 The local row was produced with `python3 main.py run --futures 25`; the Solari
 row used `python3 main.py solari --futures 3 --concurrency 1`. The Solari run
 downloaded five recordings and re-ran both failing futures with fresh sandbox
-IDs; both patched replays passed with the same event hash.
+and browser IDs; both patched replays passed with the same event/environment
+hashes, and browser/simulator parity was verified at every event boundary.
+
+## Search benchmark: what guidance actually buys
+
+The benchmark is intentionally part of the submission evidence. Across 200
+paired seeds, both strategies received exactly 128 unique candidate
+evaluations per trial:
+
+| Strategy | Unique behaviors p25 / median / p75 | Rare hit rate | First rare failure p25 / median / p75 (hits) |
+| --- | ---: | ---: | ---: |
+| Random mutation | 92 / 95 / 98 | 86.5% | 12 / 29 / 53 |
+| Coverage-guided | 97 / 99 / 103 | 91.0% | 12 / 30.5 / 61 |
+
+Guidance won the paired breadth comparison 151–42, with 7 ties. For the rare
+failure's first appearance, random won 58 pairs, guidance won 55, and 49 tied
+among the 162 pairs where both found it. The honest conclusion is that
+coverage guidance broadens the explored surface and slightly raises rare-target
+hit rate, but this run does not prove that it finds rare failures faster.
 
 ## Quick start: local proof
 
@@ -272,12 +292,20 @@ npm run start
 ```
 
 The suite checks temporal diversity, both safe and unsafe futures, the shared
-observed-trace invariant, coverage-guided mutation determinism, both failure
-classes, one-minute boundary search, failure-class-preserving minimization,
-exact input fingerprints, regression promotion, recording serving, and API
+observed-trace invariant, coverage-guided mutation determinism, matched search
+budgets, both failure classes, one-minute boundary search, failure-class-
+preserving minimization, canonical fingerprints, regression promotion,
+recording serving, browser/simulator parity, partial Solari cleanup, and API
 evidence payloads. The Next.js app uses strict TypeScript, a tracked lockfile,
 same-origin rewrites, explicit loading and error states, reduced-motion support,
-and responsive layouts.
+responsive layouts, and selected-future-scoped async evidence state.
+
+The adversarial trust audit is deliberately fail-closed at the cloud boundary:
+browser traces must contain complete state evidence and must agree with the
+deterministic simulator on final state, message count, and failure class before
+the run can report PASS. Counterfactual manifests bind the event input to the
+world contract, world asset hash, fixture, and initial state; runtime evidence
+also requires a fresh sandbox and browser session for the patched replay.
 
 ## Honest boundary
 
