@@ -4,9 +4,10 @@
 
 > Find the futures where your AI agent fails before your users do.
 
-TimeCapsule treats the future as a fuzzing surface. It explores possible
-payment, webhook, and wakeup timelines, checks a safety invariant, minimizes a
-failing timeline, and replays the same future against a patched agent.
+TimeCapsule treats the future as a fuzzing surface. It uses coverage-guided
+mutation to explore payment, dispute, webhook, and wakeup timelines, checks a
+safety invariant, binary-searches the failure boundary, minimizes a failing
+timeline, and replays the same future against a patched agent.
 
 This is a real Solari use case, not a decorative integration: cloud sandboxes
 hold isolated worlds, Solari browsers drive the agent-facing UI, and recorded
@@ -23,13 +24,15 @@ python3 dashboard/dev.py
 
 Open [http://127.0.0.1:3000](http://127.0.0.1:3000), then:
 
-1. Open the first red branch and point out the recorded contradiction:
+1. Open a red branch and point out the recorded contradiction:
    payment `PAID`, CRM `OVERDUE`, agent belief `OVERDUE`.
-2. Click **Minimize**. The candidate visibly collapses from six events to the
-   three-event counterexample: payment → unsafe wakeup → webhook.
-3. Click **Replay exact input**. The fingerprint stays fixed while the result
+2. Click **Minimize**. The candidate visibly collapses to a three-event,
+   failure-class-preserving counterexample.
+3. Read the **failure boundary**: the webhook lag is binary-searched to the
+   first failing minute while every other event remains fixed.
+4. Click **Replay exact input**. The fingerprint stays fixed while the result
    changes from original `FAIL` to patched `PASS`.
-4. Select a green branch to show that safe futures are inspectable too.
+5. Select a green branch to show that safe futures are inspectable too.
 
 That is the product loop: **FAIL → MINIMIZE → PATCHED PASS**, with the input and
 causal state visible rather than implied.
@@ -38,7 +41,7 @@ causal state visible rather than implied.
 
 ```mermaid
 flowchart LR
-  G[Deterministic future generator] --> O[TimeCapsule orchestrator]
+  G[Coverage-guided mutator] --> O[TimeCapsule orchestrator]
   O --> S1[Solari sandbox A]
   O --> S2[Solari sandbox B]
   S1 --> B1[Recorded Solari browser]
@@ -46,15 +49,25 @@ flowchart LR
   B1 --> T[Observed action trace]
   B2 --> T
   T --> I{Invariant holds?}
-  I -- no --> M[Delta-debug minimizer]
+  I -- no --> B[Binary-search failure boundary]
+  B --> M[Failure-class-preserving minimizer]
   M --> R[Replay exact input with patched agent]
   R --> X[Regression artifact]
 ```
 
-The deterministic generator varies payment timing, webhook delay, and one to
-three agent wakeups across three meaningful windows: before payment, during the
-paid-but-stale interval, and after webhook delivery. A SHA-256 fingerprint over
-the ordered event input binds the original and counterfactual runs.
+The search starts with deterministic seeds, then mutates accepted parents across
+payment delay, dispute timing, webhook delay, and wakeup placement. A candidate
+is retained when it contributes novel event kinds, adjacent event pairs,
+temporal windows, delay buckets, wakeup counts, or failure signatures. The
+selected futures form a real parent/child tree with a recorded shared event
+prefix. A SHA-256 fingerprint over the ordered event input binds the original
+and counterfactual runs.
+
+For every observed failure, TimeCapsule binary-searches the relevant webhook
+delay at one-minute resolution. The boundary report includes the last passing
+delay and first failing delay, while holding all other events constant. Delta
+debugging then preserves the selected failure class, so a dispute counterexample
+cannot be minimized into an unrelated payment counterexample.
 
 ### Why Solari is essential
 
@@ -73,26 +86,68 @@ the ordered event input binds the original and counterfactual runs.
 - **Isolated cloud execution** — one Solari sandbox and browser session per
   future, with bounded concurrency for predictable account usage.
 - **Temporal evidence** — ordered world actions prove whether contact happened
-  before the payment webhook, even after the final CRM state changes.
+  before payment or dispute synchronization, even after the final CRM state
+  changes.
 - **Counterfactual replay** — the same failing future runs against the fixed
-  agent and must pass.
+  agent and must pass in a fresh isolated environment; the manifest shows that
+  world assets, fixtures, initial state, and event input are identical and only
+  the agent policy changes.
 - **Regression promotion** — save a minimized future as a checked-in JSON case.
+- **Recordings** — view the original or patched Solari NDJSON replay directly
+  from the dashboard, with keyframe actions shown alongside the proof.
 - **Premium dashboard** — a typed Next.js frontend with responsive states,
   accessible controls, restrained motion, and a Python API behind a same-origin
   rewrite.
 
 ## The scenario
 
-The vulnerable collections agent trusts a stale CRM record. A customer payment
-updates the payment system immediately, but the webhook arrives later. If the
-agent wakes during that window, it sends an incorrect overdue reminder.
+The vulnerable collections agent trusts stale CRM records. A customer payment
+updates the payment system immediately, but the payment webhook arrives later.
+Separately, a dispute can be open in the dispute service while its CRM mirror is
+still unaware. If the agent wakes during either interval, it sends an incorrect
+overdue reminder.
 
 The patched agent verifies the payment source before contacting the customer.
 TimeCapsule makes that race explicit and checks the invariant:
 
 ```text
-no_contact_during_stale_payment_window
+no_contact_while_external_state_is_stale
 ```
+
+## Who needs this
+
+TimeCapsule is for teams whose agents act on state that propagates across
+systems and time—not for ordinary request/response unit tests.
+
+- **Collections:** a payment is settled or a dispute is opened, but the CRM
+  webhook is delayed; a scheduled collections wakeup sends a reminder in the
+  stale interval.
+- **Support:** a customer is granted, downgraded, or refunded in the billing
+  system while the support entitlement mirror is stale; an agent promises the
+  wrong plan or asks the customer to pay again.
+- **Ops:** a deploy, rollback, or incident acknowledgement reaches one control
+  plane before another; an operations agent pages, restarts, or closes work from
+  a mixed-version view of the system.
+
+The collections case is implemented here. Support and ops are concrete
+adoption targets, not claims that this example already ships those domains.
+
+## Measured benchmark
+
+These are measured runs from 2026-09-01 on an Apple Silicon machine
+(`arm64`, Python 3.14.7, Node 26.3.0), using seed `0`. Failure rate is the
+failure rate of the selected search corpus, not an estimate of production
+incident prevalence.
+
+| Mode | Futures | Candidates | Virtual horizon | Wall clock | Failure rate | Minimized to | Solari environments |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Local coverage search | 25 | 1,400 | 104.25 days | 0.0597s | 80.0% | 37.97% | 0 |
+| Solari browser/sandbox | 3 | 36 | 15.5 days | 141.205s | 66.7% | 40.0% | 5 |
+
+The local row was produced with `python3 main.py run --futures 25`; the Solari
+row used `python3 main.py solari --futures 3 --concurrency 1`. The Solari run
+downloaded five recordings and re-ran both failing futures with fresh sandbox
+IDs; both patched replays passed with the same event hash.
 
 ## Quick start: local proof
 
@@ -166,6 +221,8 @@ dashboard actions:
 | `POST` | `/api/futures/:id/compare` | Replay original and patched agents |
 | `POST` | `/api/futures/:id/minimize` | Save the smallest failing future |
 | `POST` | `/api/futures/:id/regress` | Promote the future into `regressions/` |
+| `GET` | `/api/futures/:id/recording/original` | Stream the original Solari NDJSON replay |
+| `GET` | `/api/futures/:id/recording/fixed` | Stream the patched Solari NDJSON replay |
 
 ## Run with Solari
 
@@ -215,10 +272,12 @@ npm run start
 ```
 
 The suite checks temporal diversity, both safe and unsafe futures, the shared
-observed-trace invariant, counterexample minimization, exact input fingerprints,
-regression promotion, and API evidence payloads. The Next.js app uses strict
-TypeScript, a tracked lockfile, same-origin rewrites, explicit loading and error
-states, reduced-motion support, and responsive layouts.
+observed-trace invariant, coverage-guided mutation determinism, both failure
+classes, one-minute boundary search, failure-class-preserving minimization,
+exact input fingerprints, regression promotion, recording serving, and API
+evidence payloads. The Next.js app uses strict TypeScript, a tracked lockfile,
+same-origin rewrites, explicit loading and error states, reduced-motion support,
+and responsive layouts.
 
 ## Honest boundary
 

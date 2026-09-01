@@ -263,6 +263,24 @@ def minimize(events: list[Event], predicate: Callable[[list[Event]], bool] | Non
     return current
 
 
+def minimize_for_violation(
+    events: list[Event],
+    failure_type: str | None = None,
+) -> list[Event]:
+    """Delta-debug an input without changing which invariant failure it demonstrates."""
+    original_types = [item["type"] for item in invariant_violations(execute(events))]
+    target = failure_type or (original_types[0] if original_types else None)
+    if target is None or target not in original_types:
+        return list(events)
+    return minimize(
+        events,
+        lambda candidate: any(
+            item["type"] == target
+            for item in invariant_violations(execute(candidate))
+        ),
+    )
+
+
 def comparison(events: list[Event]):
     return {"original": "PASS" if invariant_holds(execute(events)) else "FAIL",
             "patched": "PASS" if invariant_holds(execute(events, fixed=True)) else "FAIL"}

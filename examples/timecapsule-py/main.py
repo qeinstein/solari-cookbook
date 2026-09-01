@@ -5,7 +5,7 @@ import asyncio
 from pathlib import Path
 import sys
 
-from timecapsule.core import comparison, load_future, minimize, save_future
+from timecapsule.core import comparison, load_future, minimize_for_violation, save_future
 from timecapsule.runner import future_coverage, local_run
 from timecapsule.solari_runner import solari_run, timestamp_observed_trace
 
@@ -17,7 +17,7 @@ def saved_future_command(mode: str, path: Path):
         print(f"{path}: {result}")
         return 0 if result == "FAIL" else 1
     if mode == "minimize":
-        minimal = minimize(events)
+        minimal = minimize_for_violation(events)
         output = path.with_name(path.stem + "-minimal.json")
         save_future(output, minimal)
         print(f"Minimized {len(events)} events to {len(minimal)}")

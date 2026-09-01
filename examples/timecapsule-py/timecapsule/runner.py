@@ -16,7 +16,7 @@ from .core import (
     future_fingerprint,
     invariant_holds,
     invariant_violations,
-    minimize,
+    minimize_for_violation,
     save_future,
     violation_snapshot,
 )
@@ -101,10 +101,14 @@ def local_future_entry(future: SearchFuture) -> dict[str, Any]:
 
 def build_summary(entries, event_sequences, search, wall_clock_seconds, environments_used=0):
     failures = [entry for entry in entries if entry["status"] == "FAIL"]
+    future_by_id = {future.future_id: future for future in search.futures}
     original_events = sum(len(entry["events"]) for entry in failures)
     minimal_events = sum(
-        len(minimize(search.futures[index].events))
-        for index, entry in enumerate(entries)
+        len(minimize_for_violation(
+            future_by_id[entry["future_id"]].events,
+            (entry.get("violation") or {}).get("type"),
+        ))
+        for entry in entries
         if entry["status"] == "FAIL"
     )
     failure_modes = Counter(
@@ -162,7 +166,11 @@ def local_run(count: int, seed_start: int, output: Path):
     print(f"Run saved: {output}")
     first_failure = next((future for future, entry in zip(search.futures, entries) if entry["status"] == "FAIL"), None)
     if first_failure:
-        minimal = minimize(first_failure.events)
+        first_entry = next(entry for entry in entries if entry["future_id"] == first_failure.future_id)
+        minimal = minimize_for_violation(
+            first_failure.events,
+            (first_entry.get("violation") or {}).get("type"),
+        )
         minimal_path = output.parent / f"{first_failure.future_id}-minimal.json"
         save_future(minimal_path, minimal)
         result = comparison(minimal)

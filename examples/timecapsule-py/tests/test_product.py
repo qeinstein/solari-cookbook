@@ -15,6 +15,7 @@ from timecapsule.core import (
     invariant_holds,
     invariant_violations,
     minimize,
+    minimize_for_violation,
     observed_invariant_holds,
     observed_violation,
     temporal_windows,
@@ -85,6 +86,10 @@ class ProductLoopTests(unittest.TestCase):
         self.assertGreater(left.accepted_mutations, 0)
         self.assertTrue(any(future.parent_future_id for future in left.futures))
         self.assertTrue(any(future.shared_prefix_events > 1 for future in left.futures))
+        self.assertEqual(
+            [future_fingerprint(future.events) for future in coverage_guided_search(10, 7).futures],
+            [future_fingerprint(future.events) for future in left.futures[:10]],
+        )
 
     def test_search_finds_both_collections_failure_modes(self):
         search = coverage_guided_search(25)
@@ -118,6 +123,19 @@ class ProductLoopTests(unittest.TestCase):
         self.assertFalse(invariant_holds(execute(events)))
         self.assertTrue(invariant_holds(execute(events, fixed=True)))
         self.assertEqual(comparison(events), {"original": "FAIL", "patched": "PASS"})
+
+    def test_minimizer_preserves_the_selected_failure_class(self):
+        events = Scenario(1, 0, (-180,), -360, 1440).events()
+        self.assertEqual(
+            {item["type"] for item in invariant_violations(execute(events))},
+            {"active_dispute_contact"},
+        )
+        minimal = minimize_for_violation(events, "active_dispute_contact")
+        self.assertEqual(
+            {item["type"] for item in invariant_violations(execute(minimal))},
+            {"active_dispute_contact"},
+        )
+        self.assertTrue(any(event.kind == "dispute_opened" for event in minimal))
 
     def test_counterfactual_proof_changes_only_agent_policy(self):
         proof = counterfactual_proof(Scenario(1, 720, (540,)).events())

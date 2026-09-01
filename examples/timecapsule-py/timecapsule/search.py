@@ -182,7 +182,9 @@ def shared_prefix_length(left: list[Event], right: list[Event]) -> int:
 def coverage_guided_search(count: int, seed_start: int = 0) -> SearchResult:
     if count < 1:
         return SearchResult([], 0, set(), 0)
-    rng = random.Random((seed_start + 1) * 1_000_003 + count)
+    # Keep the search prefix stable: asking for 25 futures must retain the same
+    # first 10 branches as asking for 10 with the same seed.
+    rng = random.Random((seed_start + 1) * 1_000_003)
     selected: list[tuple[Scenario, SearchFuture]] = []
     seen_features: set[str] = set()
     seen_inputs: set[str] = set()

@@ -13,7 +13,7 @@ from timecapsule.core import (
     comparison,
     execute,
     future_fingerprint,
-    minimize,
+    minimize_for_violation,
     save_future,
     violation_snapshot,
 )
@@ -115,7 +115,8 @@ def make_handler(run_path, regression_dir=None):
                 events = entry_events(entry)
                 if parts[3] == "minimize":
                     original_events = events
-                    events = minimize(original_events)
+                    failure_type = (entry.get("violation") or {}).get("type")
+                    events = minimize_for_violation(original_events, failure_type)
                     output = run_path.parent / f"{parts[2]}-minimal.json"
                     result = comparison(events)
                     save_future(output, events, result)
@@ -134,7 +135,8 @@ def make_handler(run_path, regression_dir=None):
                         "saved": str(output),
                     }))
                 elif parts[3] == "regress":
-                    events = minimize(events)
+                    failure_type = (entry.get("violation") or {}).get("type")
+                    events = minimize_for_violation(events, failure_type)
                     regression_path = regression_dir / f"{parts[2]}.json"
                     result = comparison(events)
                     save_future(regression_path, events, result)
