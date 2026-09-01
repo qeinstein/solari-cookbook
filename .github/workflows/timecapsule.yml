@@ -1,0 +1,61 @@
+name: TimeCapsule checks
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "examples/timecapsule-py/**"
+      - ".github/workflows/timecapsule.yml"
+  pull_request:
+    paths:
+      - "examples/timecapsule-py/**"
+      - ".github/workflows/timecapsule.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    name: Python product loop
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.12"]
+    defaults:
+      run:
+        working-directory: examples/timecapsule-py
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Run product tests
+        run: python -m unittest discover -s tests -v
+      - name: Compile Python sources
+        run: python -m py_compile main.py dashboard/server.py world/server.py timecapsule/*.py
+
+  frontend:
+    name: Next.js production build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: examples/timecapsule-py/dashboard
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: examples/timecapsule-py/dashboard/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Build
+        run: npm run build

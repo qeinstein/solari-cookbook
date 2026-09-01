@@ -45,6 +45,23 @@ async def goto_preview(page, preview_url: str):
             await asyncio.sleep(0.5)
 
 
+async def click_world_action(page, selector: str, action: str):
+    """Click a world control and wait until its state update has committed."""
+    await page.locator(selector).click()
+    sync_status = page.locator("#sync-status")
+    for _ in range(40):
+        state = await sync_status.get_attribute("data-state")
+        completed_action = await sync_status.get_attribute("data-action")
+        if state == "ready" and completed_action == action:
+            return
+        await asyncio.sleep(0.25)
+    raise RuntimeError(f"world action did not settle: {action}")
+
+
+async def read_world_trace(page):
+    return json.loads(await page.locator("#trace").inner_text())
+
+
 def serializable_world(world):
     return {
         "payment_status": world.payment_status,
@@ -122,24 +139,28 @@ async def solari_future(seed: int, fixed: bool = False, recording_dir: Path | No
                     browser_session_id = browser.id
                     page = await browser.new_page()
                     await goto_preview(page, preview_url)
-                    await page.locator('button[data-action="reset"]').click()
+                    await click_world_action(page, 'button[data-action="reset"]', "reset")
                     for event in generate_future(seed):
                         if event.kind == "customer_payment":
-                            await page.locator('button[data-action="pay"]').click()
+                            await click_world_action(page, 'button[data-action="pay"]', "pay")
                         elif event.kind == "agent_wakeup":
                             action = "fixed" if fixed else "original"
-                            await page.locator(f'button[data-action="agent/{action}"]').click()
+                            await click_world_action(page, f'button[data-action="agent/{action}"]', f"agent/{action}")
                         elif event.kind == "payment_webhook":
-                            await page.locator('button[data-action="webhook"]').click()
+                            await click_world_action(page, 'button[data-action="webhook"]', "webhook")
                     messages = await page.locator("#messages").inner_text()
                     payment = await page.locator("#payment").inner_text()
                     crm = await page.locator("#crm").inner_text()
-                    failed = payment == "PAID" and crm == "OVERDUE" and messages != "No messages sent."
+                    trace = await read_world_trace(page)
+                    webhook_index = next((index for index, item in enumerate(trace) if item["action"] == "webhook"), None)
+                    agent_index = next((index for index, item in enumerate(trace) if item["action"] == f"agent/{'fixed' if fixed else 'original'}" and item.get("sent")), None)
+                    failed = (not fixed and payment == "PAID" and messages != "No messages sent."
+                              and agent_index is not None and webhook_index is not None and agent_index < webhook_index)
                     result = {"future_id": f"future-{seed}", "seed": seed, "status": "FAIL" if failed else "PASS",
                               "agent": "fixed" if fixed else "original", "sandbox_id": sandbox.sandboxId,
                               "browser_session_id": browser_session_id, "preview_url": preview_url,
                               "events": [event.as_dict() for event in generate_future(seed)],
-                              "observed": {"payment": payment, "crm": crm, "messages": messages}}
+                              "observed": {"payment": payment, "crm": crm, "messages": messages, "trace": trace}}
                     # rrweb batches recording events; let the final batch flush before release.
                     await asyncio.sleep(2)
                 if recording_dir and browser_session_id:
@@ -164,15 +185,21 @@ async def solari_future(seed: int, fixed: bool = False, recording_dir: Path | No
             await sandbox.kill()
 
 
-async def solari_run(count: int, seed_start: int, output: Path):
+async def solari_run(count: int, seed_start: int, output: Path, concurrency: int = 1):
     if not os.environ.get("SOLARI_API_KEY"):
         raise SystemExit("SOLARI_API_KEY is required for Solari mode")
+    if concurrency < 1:
+        raise SystemExit("--concurrency must be at least 1")
     recording_dir = output.parent / "replays"
-    results = await asyncio.gather(*(solari_future(seed, recording_dir=recording_dir)
-                                     for seed in range(seed_start, seed_start + count)))
+    semaphore = asyncio.Semaphore(concurrency)
+
+    async def bounded_future(seed: int, fixed: bool = False):
+        async with semaphore:
+            return await solari_future(seed, fixed=fixed, recording_dir=recording_dir)
+
+    results = await asyncio.gather(*(bounded_future(seed) for seed in range(seed_start, seed_start + count)))
     failing_seeds = [result["seed"] for result in results if result["status"] == "FAIL"]
-    patched = await asyncio.gather(*(solari_future(seed, fixed=True, recording_dir=recording_dir)
-                                     for seed in failing_seeds))
+    patched = await asyncio.gather(*(bounded_future(seed, fixed=True) for seed in failing_seeds))
     patched_by_seed = {result["seed"]: result for result in patched}
     for result in results:
         candidate = patched_by_seed.get(result["seed"])
@@ -190,7 +217,7 @@ async def solari_run(count: int, seed_start: int, output: Path):
                                               "coverage": future_coverage(
                                                   [generate_future(seed) for seed in range(seed_start, seed_start + count)])}}, indent=2) + "\n")
     print("Solari exploration")
-    print(f"Isolated futures: {len(results)} (sandbox + browser per future, run concurrently)")
+    print(f"Isolated futures: {len(results)} (sandbox + browser per future, max concurrency {concurrency})")
     print(f"Failures found: {len(failing_seeds)}")
     print(f"Patched replays: {len(patched)}")
     print(f"Run saved: {output}")
@@ -242,6 +269,7 @@ def main():
     cloud = sub.add_parser("solari", help="run isolated futures in Solari")
     cloud.add_argument("--futures", type=int, default=2)
     cloud.add_argument("--seed", type=int, default=0)
+    cloud.add_argument("--concurrency", type=int, default=1, help="maximum simultaneous sandbox/browser pairs")
     cloud.add_argument("--output", type=Path, default=Path("runs/solari-latest.json"))
     for mode in ("replay", "minimize", "compare"):
         command = sub.add_parser(mode, help=f"{mode} a saved future")
@@ -252,7 +280,7 @@ def main():
     if args.mode in {"run", "local"}:
         local_run(args.futures, args.seed, args.output)
     elif args.mode == "solari":
-        asyncio.run(solari_run(args.futures, args.seed, args.output))
+        asyncio.run(solari_run(args.futures, args.seed, args.output, args.concurrency))
     elif args.mode == "regress":
         raise SystemExit(regress(args.directory))
     else:

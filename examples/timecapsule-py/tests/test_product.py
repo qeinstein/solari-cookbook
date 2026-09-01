@@ -26,6 +26,8 @@ class ProductLoopTests(unittest.TestCase):
         self.assertIn('data-action="pay"', text)
         self.assertIn('data-action="agent/original"', text)
         self.assertIn('data-action="agent/fixed"', text)
+        self.assertIn('id="sync-status"', text)
+        self.assertIn('id="trace"', text)
 
     def test_future_coverage_reports_observed_event_orders(self):
         coverage = future_coverage([generate_future(seed) for seed in range(25)])
@@ -70,6 +72,10 @@ class DashboardApiTests(unittest.TestCase):
             thread = Thread(target=server.serve_forever, daemon=True)
             thread.start()
             try:
+                with urlopen(f"http://127.0.0.1:{server.server_port}/health") as response:
+                    health = json.load(response)
+                    self.assertEqual(health, {"status": "ok", "run_exists": True})
+                    self.assertEqual(response.headers["Cache-Control"], "no-store")
                 request = Request(
                     f"http://127.0.0.1:{server.server_port}/api/futures/future-0/regress",
                     method="POST",

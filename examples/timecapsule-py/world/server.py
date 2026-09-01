@@ -6,11 +6,11 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 ROOT = Path(__file__).parent
-STATE = {"payment": "unpaid", "crm": "overdue", "messages": [], "webhook_scheduled": False}
+STATE = {"payment": "unpaid", "crm": "overdue", "messages": [], "webhook_scheduled": False, "trace": []}
 
 
 def reset():
-    STATE.update(payment="unpaid", crm="overdue", messages=[], webhook_scheduled=False)
+    STATE.update(payment="unpaid", crm="overdue", messages=[], webhook_scheduled=False, trace=[])
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -38,14 +38,20 @@ class Handler(BaseHTTPRequestHandler):
         elif path == "/pay":
             STATE["payment"] = "paid"
             STATE["webhook_scheduled"] = True
+            STATE["trace"].append({"action": "pay"})
         elif path == "/webhook":
             STATE["crm"] = "paid"
+            STATE["trace"].append({"action": "webhook"})
         elif path == "/agent/original":
-            if STATE["crm"] == "overdue":
+            sent = STATE["crm"] == "overdue"
+            if sent:
                 STATE["messages"].append("Your payment remains overdue.")
+            STATE["trace"].append({"action": "agent/original", "sent": sent})
         elif path == "/agent/fixed":
-            if STATE["crm"] == "overdue" and STATE["payment"] != "paid":
+            sent = STATE["crm"] == "overdue" and STATE["payment"] != "paid"
+            if sent:
                 STATE["messages"].append("Your payment remains overdue.")
+            STATE["trace"].append({"action": "agent/fixed", "sent": sent})
         else:
             self.send_body(b"not found", 404, "text/plain")
             return

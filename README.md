@@ -1,5 +1,7 @@
 # Solari Cookbook
 
+[![TimeCapsule checks](https://img.shields.io/github/actions/workflow/status/qeinstein/solari-cookbook/timecapsule.yml?branch=main&style=flat-square&label=TimeCapsule%20checks)](https://github.com/qeinstein/solari-cookbook/actions/workflows/timecapsule.yml) [![MIT License](https://img.shields.io/github/license/qeinstein/solari-cookbook?style=flat-square)](LICENSE)
+
 Short, runnable examples for [Solari](https://getsolari.com) — cloud browsers,
 sandboxes, and desktops behind one API key.
 
@@ -8,6 +10,8 @@ They are deliberately small: one idea each, no framework, no scaffolding to read
 past. Copy one into your project and change the parts you care about.
 
 ## Featured example: TimeCapsule
+
+[![Explore TimeCapsule](https://img.shields.io/badge/Explore-TimeCapsule-687158?style=for-the-badge)](examples/timecapsule-py)
 
 [TimeCapsule](examples/timecapsule-py) explores long-running agent futures: each
 future gets an isolated Solari sandbox and recorded cloud browser, failures are
