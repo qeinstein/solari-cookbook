@@ -56,7 +56,7 @@ class DashboardApiTests(unittest.TestCase):
                 with urlopen(request) as response:
                     payload = json.load(response)
                 saved = Path(payload["regression"])
-                self.assertEqual(payload["events"], 4)
+                self.assertEqual(payload["events"], 3)
                 self.assertTrue(saved.exists())
                 self.assertEqual(json.loads(saved.read_text())["result"], comparison(events))
             finally:

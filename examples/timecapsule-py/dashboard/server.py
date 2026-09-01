@@ -40,6 +40,7 @@ def make_handler(run_path, regression_dir=None):
                 events = minimize(events); output = run_path.parent / f"{parts[2]}-minimal.json"; result = comparison(events); save_future(output, events, result)
                 self.body(json.dumps({"events": len(events), "comparison": result, "saved": str(output)}))
             elif parts[3] == "regress":
+                events = minimize(events)
                 regression_path = regression_dir / f"{parts[2]}.json"
                 result = comparison(events); save_future(regression_path, events, result)
                 self.body(json.dumps({"events": len(events), "comparison": result, "regression": str(regression_path)}))
