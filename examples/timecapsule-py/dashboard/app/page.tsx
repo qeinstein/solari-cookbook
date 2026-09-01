@@ -351,7 +351,10 @@ function Evidence({
 }) {
   const actionHash = selectedAction?.payload.input_hash;
   const sameInput = selectedAction?.payload.same_input || cloudSameInput;
-  const recording = selected?.recording_status ?? selected?.patched_run?.recording_status;
+  const recording = selected?.recording_status
+    ?? (selected?.recording_path ? "downloaded" : undefined)
+    ?? selected?.patched_run?.recording_status
+    ?? (selected?.patched_run?.recording_path ? "downloaded" : undefined);
   return (
     <div className="evidence-card">
       <div><span>Input fingerprint</span><code>{shortHash(actionHash ?? selected?.input_hash)}</code></div>

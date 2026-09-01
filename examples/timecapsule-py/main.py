@@ -194,6 +194,7 @@ async def solari_future(seed: int, fixed: bool = False, recording_dir: Path | No
                         try:
                             replay = await solari.sessions.download_replay(browser_session_id)
                             recording_path.write_bytes(replay)
+                            result["recording_status"] = "downloaded"
                             result["recording_path"] = str(recording_path)
                             result["recording_bytes"] = len(replay)
                             result["recording_events"] = len(replay.decode().splitlines())
