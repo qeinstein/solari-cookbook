@@ -65,9 +65,10 @@ def local_run(count: int, seed_start: int, output: Path):
         print(f"Minimal future saved: {minimal_path}")
 
 
-async def solari_future(seed: int, fixed: bool = False):
+async def solari_future(seed: int, fixed: bool = False, recording_dir: Path | None = None):
     """Run one future in one isolated Solari sandbox + browser pair."""
     from solari_browser import Solari
+    from solari_browser.errors import SolariError
     from solari_sandbox import SandboxClient
 
     sandbox_client = SandboxClient(api_key=os.environ["SOLARI_API_KEY"], base_url="https://api.getsolari.com")
@@ -84,7 +85,10 @@ async def solari_future(seed: int, fixed: bool = False):
             preview_url = preview["url"]
 
             async with Solari(api_key=os.environ["SOLARI_API_KEY"]) as solari:
+                browser_session_id = None
+                result = None
                 async with await solari.launch(recording=True) as browser:
+                    browser_session_id = browser.id
                     page = await browser.new_page()
                     await page.goto(preview_url)
                     await page.locator('button[data-action="reset"]').click()
@@ -100,11 +104,31 @@ async def solari_future(seed: int, fixed: bool = False):
                     payment = await page.locator("#payment").inner_text()
                     crm = await page.locator("#crm").inner_text()
                     failed = payment == "PAID" and crm == "OVERDUE" and messages != "No messages sent."
-                    return {"future_id": f"future-{seed}", "seed": seed, "status": "FAIL" if failed else "PASS",
-                            "agent": "fixed" if fixed else "original", "sandbox_id": sandbox.sandboxId,
-                            "browser_session_id": browser.id, "preview_url": preview_url,
-                            "events": [event.as_dict() for event in generate_future(seed)],
-                            "observed": {"payment": payment, "crm": crm, "messages": messages}}
+                    result = {"future_id": f"future-{seed}", "seed": seed, "status": "FAIL" if failed else "PASS",
+                              "agent": "fixed" if fixed else "original", "sandbox_id": sandbox.sandboxId,
+                              "browser_session_id": browser_session_id, "preview_url": preview_url,
+                              "events": [event.as_dict() for event in generate_future(seed)],
+                              "observed": {"payment": payment, "crm": crm, "messages": messages}}
+                    # rrweb batches recording events; let the final batch flush before release.
+                    await asyncio.sleep(2)
+                if recording_dir and browser_session_id:
+                    recording_dir.mkdir(parents=True, exist_ok=True)
+                    recording_path = recording_dir / f"future-{seed}-{'fixed' if fixed else 'original'}.ndjson"
+                    for _ in range(10):
+                        try:
+                            replay = await solari.sessions.download_replay(browser_session_id)
+                            recording_path.write_bytes(replay)
+                            result["recording_path"] = str(recording_path)
+                            result["recording_bytes"] = len(replay)
+                            result["recording_events"] = len(replay.decode().splitlines())
+                            break
+                        except SolariError as error:
+                            if error.status != 404:
+                                raise
+                            await asyncio.sleep(3)
+                    else:
+                        result["recording_status"] = "not_ready_after_30s"
+                return result
         finally:
             await sandbox.kill()
 
@@ -112,9 +136,12 @@ async def solari_future(seed: int, fixed: bool = False):
 async def solari_run(count: int, seed_start: int, output: Path):
     if not os.environ.get("SOLARI_API_KEY"):
         raise SystemExit("SOLARI_API_KEY is required for Solari mode")
-    results = await asyncio.gather(*(solari_future(seed) for seed in range(seed_start, seed_start + count)))
+    recording_dir = output.parent / "replays"
+    results = await asyncio.gather(*(solari_future(seed, recording_dir=recording_dir)
+                                     for seed in range(seed_start, seed_start + count)))
     failing_seeds = [result["seed"] for result in results if result["status"] == "FAIL"]
-    patched = await asyncio.gather(*(solari_future(seed, fixed=True) for seed in failing_seeds))
+    patched = await asyncio.gather(*(solari_future(seed, fixed=True, recording_dir=recording_dir)
+                                     for seed in failing_seeds))
     patched_by_seed = {result["seed"]: result for result in patched}
     for result in results:
         candidate = patched_by_seed.get(result["seed"])
