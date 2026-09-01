@@ -13,12 +13,15 @@ from timecapsule.core import (
     future_fingerprint,
     generate_future,
     invariant_holds,
+    invariant_violations,
     minimize,
     observed_invariant_holds,
     observed_violation,
     temporal_windows,
 )
+from timecapsule.evidence import counterfactual_proof
 from timecapsule.execution import execute_future
+from timecapsule.search import Scenario, coverage_guided_search, find_failure_boundaries
 from http.server import ThreadingHTTPServer
 
 
@@ -36,6 +39,10 @@ class ProductLoopTests(unittest.TestCase):
         self.assertIn('data-action="pay"', text)
         self.assertIn('data-action="agent/original"', text)
         self.assertIn('data-action="agent/fixed"', text)
+        self.assertIn('data-action="dispute"', text)
+        self.assertIn('data-action="dispute-webhook"', text)
+        self.assertIn('id="dispute"', text)
+        self.assertIn('id="crm-dispute"', text)
         self.assertIn('id="sync-status"', text)
         self.assertIn('id="trace"', text)
 
@@ -51,12 +58,75 @@ class ProductLoopTests(unittest.TestCase):
         self.assertEqual(windows, {"before_payment", "stale_window", "after_webhook"})
 
     def test_future_coverage_reports_temporal_windows(self):
-        coverage = future_coverage([generate_future(seed) for seed in range(25)])
-        self.assertEqual(coverage["covered"], 3)
-        self.assertEqual(coverage["possible"], 3)
+        search = coverage_guided_search(25)
+        coverage = future_coverage([future.events for future in search.futures])
+        self.assertEqual(coverage["covered"], 6)
+        self.assertEqual(coverage["possible"], 6)
         self.assertEqual(
             {pattern["id"] for pattern in coverage["patterns"]},
-            {"before_payment", "stale_window", "after_webhook"},
+            {
+                "payment-window:before",
+                "payment-window:stale",
+                "payment-window:after",
+                "dispute-window:before",
+                "dispute-window:active",
+                "dispute-window:after",
+            },
+        )
+
+    def test_coverage_guided_search_is_deterministic_and_mutates_parents(self):
+        left = coverage_guided_search(25, seed_start=7)
+        right = coverage_guided_search(25, seed_start=7)
+        self.assertEqual(
+            [future_fingerprint(future.events) for future in left.futures],
+            [future_fingerprint(future.events) for future in right.futures],
+        )
+        self.assertEqual(left.candidates_evaluated, right.candidates_evaluated)
+        self.assertGreater(left.accepted_mutations, 0)
+        self.assertTrue(any(future.parent_future_id for future in left.futures))
+        self.assertTrue(any(future.shared_prefix_events > 1 for future in left.futures))
+
+    def test_search_finds_both_collections_failure_modes(self):
+        search = coverage_guided_search(25)
+        signatures = {
+            tuple(sorted({item["type"] for item in invariant_violations(execute(future.events))}))
+            for future in search.futures
+        }
+        self.assertIn(("stale_payment_contact",), signatures)
+        self.assertIn(("active_dispute_contact",), signatures)
+        self.assertIn(("active_dispute_contact", "stale_payment_contact"), signatures)
+        self.assertGreaterEqual(len(search.features_discovered), 40)
+
+    def test_failure_boundary_is_binary_searched_to_one_minute(self):
+        payment = Scenario(1, 720, (540,)).events()
+        dispute = Scenario(1, 0, (-180,), -360, 1440).events()
+        payment_boundary = find_failure_boundaries(payment)[0]
+        dispute_boundary = find_failure_boundaries(dispute)[0]
+        self.assertEqual(
+            (payment_boundary["last_passing_minutes"], payment_boundary["first_failing_minutes"]),
+            (540, 541),
+        )
+        self.assertEqual(
+            (dispute_boundary["last_passing_minutes"], dispute_boundary["first_failing_minutes"]),
+            (180, 181),
+        )
+        self.assertEqual(payment_boundary["resolution_minutes"], 1)
+        self.assertEqual(dispute_boundary["resolution_minutes"], 1)
+
+    def test_fixed_agent_suppresses_active_dispute_contact(self):
+        events = Scenario(1, 0, (-180,), -360, 1440).events()
+        self.assertFalse(invariant_holds(execute(events)))
+        self.assertTrue(invariant_holds(execute(events, fixed=True)))
+        self.assertEqual(comparison(events), {"original": "FAIL", "patched": "PASS"})
+
+    def test_counterfactual_proof_changes_only_agent_policy(self):
+        proof = counterfactual_proof(Scenario(1, 720, (540,)).events())
+        self.assertTrue(proof["verified"])
+        self.assertEqual(proof["differing_fields"], ["agent_policy"])
+        self.assertEqual(proof["original"]["event_hash"], proof["patched"]["event_hash"])
+        self.assertEqual(
+            proof["original"]["world_asset_hash"],
+            proof["patched"]["world_asset_hash"],
         )
 
     def test_observed_invariant_uses_trace_not_agent_name(self):
@@ -67,7 +137,7 @@ class ProductLoopTests(unittest.TestCase):
         ]
 
         self.assertFalse(observed_invariant_holds(fixed_agent_bug))
-        self.assertEqual(observed_violation(fixed_agent_bug)["crm_status"], "OVERDUE")
+        self.assertEqual(observed_violation(fixed_agent_bug)["mirror_value"], "OVERDUE")
 
     def test_browser_trace_is_bound_to_virtual_event_time(self):
         events = generate_future(0)
@@ -86,20 +156,29 @@ class ProductLoopTests(unittest.TestCase):
 
     def test_dashboard_surfaces_agent_belief_and_documentation_link(self):
         page = Path(__file__).parents[1] / "dashboard/app/page.tsx"
-        text = page.read_text()
-        self.assertIn("Agent belief", text)
-        self.assertIn('className="docs-link"', text)
+        inspector = Path(__file__).parents[1] / "dashboard/components/Inspector.tsx"
+        tree = Path(__file__).parents[1] / "dashboard/components/FutureTree.tsx"
+        self.assertIn("Agent belief", inspector.read_text())
+        self.assertIn("Same future manifest", inspector.read_text())
+        self.assertIn("parent_future_id", tree.read_text())
+        self.assertIn('className="docs-link"', page.read_text())
 
     def test_local_run_persists_patch_outcomes(self):
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / "latest.json"
-            local_run(1, 0, output)
+            local_run(25, 0, output)
             data = json.loads(output.read_text())
-            self.assertEqual(data["futures"][0]["comparison"], {"original": "FAIL", "patched": "PASS"})
-            self.assertEqual(data["futures"][0]["input_hash"], future_fingerprint(generate_future(0)))
-            self.assertIsNotNone(data["futures"][0]["violation"])
-            self.assertEqual(data["summary"]["coverage"]["covered"], 2)
-            self.assertEqual(data["summary"]["patched_replays"], 1)
+            failures = [future for future in data["futures"] if future["status"] == "FAIL"]
+            self.assertGreater(len(failures), 0)
+            self.assertTrue(all(future["comparison"] == {"original": "FAIL", "patched": "PASS"} for future in failures))
+            self.assertTrue(all(future["counterfactual_proof"]["verified"] for future in data["futures"]))
+            self.assertTrue(all(future["input_hash"] == future["counterfactual_proof"]["original"]["event_hash"] for future in data["futures"]))
+            self.assertEqual(data["summary"]["coverage"]["covered"], 6)
+            self.assertEqual(data["summary"]["patched_replays"], len(failures))
+            self.assertEqual(set(data["summary"]["failure_modes"]), {"stale_payment_contact", "active_dispute_contact"})
+            self.assertEqual(data["summary"]["search"]["strategy"], "coverage_guided_mutation")
+            self.assertGreater(data["summary"]["search"]["candidates_evaluated"], 25)
+            self.assertGreaterEqual(data["summary"]["wall_clock_seconds"], 0)
 
     def test_structured_execution_record_matches_core_outcome(self):
         execution = execute_future("future-0", generate_future(0), seed=0)
@@ -122,6 +201,32 @@ class DashboardApiTests(unittest.TestCase):
         thread = Thread(target=server.serve_forever, daemon=True)
         thread.start()
         return server, thread, events, regression_dir
+
+    def test_recording_route_serves_only_run_replay_assets(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            replay_dir = root / "runs" / "replays"
+            replay_dir.mkdir(parents=True)
+            recording = replay_dir / "future-0-original.ndjson"
+            recording.write_text('{"action":"pay"}\n')
+            run_path = root / "runs" / "latest.json"
+            events = generate_future(0)
+            run_path.write_text(json.dumps({"futures": [{
+                "future_id": "future-0",
+                "recording_path": str(recording),
+                "events": [event.as_dict() for event in events],
+            }]}))
+            server = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(run_path, root / "regressions"))
+            thread = Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            try:
+                with urlopen(f"http://127.0.0.1:{server.server_port}/api/futures/future-0/recording/original") as response:
+                    self.assertEqual(response.read(), b'{"action":"pay"}\n')
+                    self.assertEqual(response.headers["Content-Type"], "application/x-ndjson; charset=utf-8")
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join()
 
     def test_minimize_returns_before_and_after_evidence(self):
         with tempfile.TemporaryDirectory() as directory:

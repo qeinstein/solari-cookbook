@@ -17,6 +17,8 @@ from timecapsule.core import (
     save_future,
     violation_snapshot,
 )
+from timecapsule.evidence import counterfactual_proof
+from timecapsule.search import find_failure_boundaries
 
 
 def entry_events(entry):
@@ -30,6 +32,21 @@ def read_run(run_path):
     if not isinstance(data, dict) or not isinstance(data.get("futures", []), list):
         raise ValueError("run file must contain a futures array")
     return data
+
+
+def recording_path_for(entry, agent, run_path):
+    source = entry if agent == "original" else entry.get("patched_run", {})
+    value = source.get("recording_path")
+    if not value:
+        return None
+    path = Path(value)
+    if not path.is_absolute():
+        path = Path(__file__).parents[1] / path
+    path = path.resolve()
+    allowed = (run_path.parent / "replays").resolve()
+    if path.parent != allowed or not path.is_file():
+        return None
+    return path
 
 
 def make_handler(run_path, regression_dir=None):
@@ -58,6 +75,21 @@ def make_handler(run_path, regression_dir=None):
                     self.error(f"run unavailable: {exc}", 503)
             elif path == "/health":
                 self.body(json.dumps({"status": "ok", "run_exists": run_path.exists()}))
+            elif re.fullmatch(r"/api/futures/[A-Za-z0-9._-]+/recording/(original|fixed)", path):
+                _, _, _, future_id, _, agent = path.split("/")
+                try:
+                    data = read_run(run_path)
+                    entry = next(
+                        (item for item in data["futures"] if item["future_id"] == future_id),
+                        None,
+                    )
+                    recording = recording_path_for(entry or {}, agent, run_path)
+                    if recording is None:
+                        self.error("recording not available", 404)
+                        return
+                    self.body(recording.read_bytes(), content_type="application/x-ndjson")
+                except (OSError, ValueError, json.JSONDecodeError) as exc:
+                    self.error(f"recording unavailable: {exc}", 503)
             else:
                 self.error("not found", 404)
 
@@ -96,6 +128,8 @@ def make_handler(run_path, regression_dir=None):
                         "input_hash": future_fingerprint(original_events),
                         "minimal_input_hash": future_fingerprint(events),
                         "minimal_violation": violation_snapshot(execute(events)),
+                        "boundaries": find_failure_boundaries(events),
+                        "counterfactual_proof": counterfactual_proof(events),
                         "comparison": result,
                         "saved": str(output),
                     }))
@@ -109,6 +143,8 @@ def make_handler(run_path, regression_dir=None):
                         "minimal_events": [event.as_dict() for event in events],
                         "minimal_input_hash": future_fingerprint(events),
                         "minimal_violation": violation_snapshot(execute(events)),
+                        "boundaries": find_failure_boundaries(events),
+                        "counterfactual_proof": counterfactual_proof(events),
                         "comparison": result,
                         "regression": str(regression_path),
                     }))
@@ -118,6 +154,7 @@ def make_handler(run_path, regression_dir=None):
                         "comparison": comparison(events),
                         "input_hash": fingerprint,
                         "same_input": True,
+                        "counterfactual_proof": counterfactual_proof(events),
                     }))
             except (KeyError, TypeError, ValueError, OSError, json.JSONDecodeError) as exc:
                 self.error(f"future action failed: {exc}", 422)

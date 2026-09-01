@@ -6,11 +6,40 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 ROOT = Path(__file__).parent
-STATE = {"payment": "unpaid", "crm": "overdue", "messages": [], "webhook_scheduled": False, "trace": []}
+STATE = {
+    "payment": "unpaid",
+    "crm": "overdue",
+    "dispute": "none",
+    "crm_dispute": "none",
+    "messages": [],
+    "webhook_scheduled": False,
+    "dispute_webhook_scheduled": False,
+    "trace": [],
+}
 
 
 def reset():
-    STATE.update(payment="unpaid", crm="overdue", messages=[], webhook_scheduled=False, trace=[])
+    STATE.update(
+        payment="unpaid",
+        crm="overdue",
+        dispute="none",
+        crm_dispute="none",
+        messages=[],
+        webhook_scheduled=False,
+        dispute_webhook_scheduled=False,
+        trace=[],
+    )
+
+
+def snapshot(action, **extra):
+    return {
+        "action": action,
+        "payment": STATE["payment"],
+        "crm": STATE["crm"],
+        "dispute": STATE["dispute"],
+        "crm_dispute": STATE["crm_dispute"],
+        **extra,
+    }
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -38,26 +67,32 @@ class Handler(BaseHTTPRequestHandler):
         elif path == "/pay":
             STATE["payment"] = "paid"
             STATE["webhook_scheduled"] = True
-            STATE["trace"].append({"action": "pay", "payment": STATE["payment"], "crm": STATE["crm"]})
+            STATE["trace"].append(snapshot("pay"))
         elif path == "/webhook":
             STATE["crm"] = "paid"
-            STATE["trace"].append({"action": "webhook", "payment": STATE["payment"], "crm": STATE["crm"]})
+            STATE["trace"].append(snapshot("webhook"))
+        elif path == "/dispute":
+            STATE["dispute"] = "open"
+            STATE["dispute_webhook_scheduled"] = True
+            STATE["trace"].append(snapshot("dispute"))
+        elif path == "/dispute-webhook":
+            STATE["crm_dispute"] = "open"
+            STATE["trace"].append(snapshot("dispute-webhook"))
         elif path == "/agent/original":
-            sent = STATE["crm"] == "overdue"
+            sent = STATE["crm"] == "overdue" and STATE["crm_dispute"] != "open"
             if sent:
                 STATE["messages"].append("Your payment remains overdue.")
-            STATE["trace"].append({
-                "action": "agent/original", "sent": sent,
-                "payment": STATE["payment"], "crm": STATE["crm"],
-            })
+            STATE["trace"].append(snapshot("agent/original", sent=sent))
         elif path == "/agent/fixed":
-            sent = STATE["crm"] == "overdue" and STATE["payment"] != "paid"
+            sent = (
+                STATE["crm"] == "overdue"
+                and STATE["crm_dispute"] != "open"
+                and STATE["payment"] != "paid"
+                and STATE["dispute"] != "open"
+            )
             if sent:
                 STATE["messages"].append("Your payment remains overdue.")
-            STATE["trace"].append({
-                "action": "agent/fixed", "sent": sent,
-                "payment": STATE["payment"], "crm": STATE["crm"],
-            })
+            STATE["trace"].append(snapshot("agent/fixed", sent=sent))
         else:
             self.send_body(b"not found", 404, "text/plain")
             return
