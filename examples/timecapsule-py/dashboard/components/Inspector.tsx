@@ -75,6 +75,7 @@ function CounterfactualDiff({ proof }: { proof?: CounterfactualProof }) {
       <div className="diff-row"><span>World assets</span><code>{shortHash(proof.original.world_asset_hash)}</code><strong>=</strong><code>{shortHash(proof.patched.world_asset_hash)}</code></div>
       <div className="diff-row changed"><span>Agent policy</span><code>{proof.only_change.original}</code><strong>→</strong><code>{proof.only_change.patched}</code></div>
       <p>All {proof.identical_fields.length} environment inputs match. Only <code>agent_policy</code> changes.</p>
+      {proof.runtime?.same_event_hash && proof.runtime.fresh_isolation ? <p className="runtime-proof">Runtime verified · same event hash · fresh sandbox for patched replay.</p> : null}
     </div>
   );
 }

@@ -165,6 +165,7 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--olive-dark); ou
 .diff-row.changed { background: var(--red-soft); }
 .diff-row.changed strong { color: var(--red); }
 .counterfactual-diff p { margin: 0; padding: 7px 8px; color: var(--muted); font-size: 8px; }
+.counterfactual-diff p.runtime-proof { border-top: 1px solid var(--rule); color: var(--olive-dark); font-weight: 650; }
 .recording-card { margin: 0 0 3px; padding: 9px; border: 1px solid var(--rule); background: #f4f3ed; }
 .recording-head { display: flex; justify-content: space-between; color: var(--muted); font-size: 8px; letter-spacing: .08em; text-transform: uppercase; }
 .recording-head b { color: var(--ink); }

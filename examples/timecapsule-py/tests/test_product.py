@@ -178,6 +178,7 @@ class ProductLoopTests(unittest.TestCase):
         tree = Path(__file__).parents[1] / "dashboard/components/FutureTree.tsx"
         self.assertIn("Agent belief", inspector.read_text())
         self.assertIn("Same future manifest", inspector.read_text())
+        self.assertIn("fresh sandbox for patched replay", inspector.read_text())
         self.assertIn("parent_future_id", tree.read_text())
         self.assertIn('className="docs-link"', page.read_text())
 
