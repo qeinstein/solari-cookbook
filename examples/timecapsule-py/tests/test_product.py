@@ -6,6 +6,7 @@ import unittest
 from urllib.request import Request, urlopen
 
 from dashboard.server import make_handler
+from main import future_coverage
 from timecapsule.core import comparison, generate_future, invariant_holds, minimize, execute
 from http.server import ThreadingHTTPServer
 
@@ -24,6 +25,12 @@ class ProductLoopTests(unittest.TestCase):
         self.assertIn('data-action="pay"', text)
         self.assertIn('data-action="agent/original"', text)
         self.assertIn('data-action="agent/fixed"', text)
+
+    def test_future_coverage_reports_observed_event_orders(self):
+        coverage = future_coverage([generate_future(seed) for seed in range(25)])
+        self.assertEqual(coverage["covered"], 2)
+        self.assertEqual(coverage["possible"], 2)
+        self.assertEqual(len(coverage["patterns"]), 2)
 
 
 class DashboardApiTests(unittest.TestCase):

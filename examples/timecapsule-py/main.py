@@ -11,6 +11,10 @@ import sys
 from timecapsule.core import comparison, execute, generate_future, invariant_holds, load_future, minimize, save_future
 
 ROOT = Path(__file__).parent
+EVENT_ORDER_PATTERNS = {
+    ("customer_payment", "agent_wakeup", "payment_webhook"),
+    ("customer_payment", "payment_webhook", "agent_wakeup"),
+}
 
 
 def event_span_days(events):
@@ -18,6 +22,15 @@ def event_span_days(events):
     if len(events) < 2:
         return 0
     return (events[-1].at - events[0].at).total_seconds() / 86400
+
+
+def future_coverage(event_sequences):
+    """Summarize the event-ordering patterns observed in an exploration."""
+    patterns = sorted({
+        tuple(event.kind for event in events if event.kind != "invoice_created")
+        for events in event_sequences
+    })
+    return {"covered": len(patterns), "possible": len(EVENT_ORDER_PATTERNS), "patterns": patterns}
 
 
 async def goto_preview(page, preview_url: str):
@@ -61,7 +74,9 @@ def local_run(count: int, seed_start: int, output: Path):
                                   "started_at": datetime.now().astimezone().isoformat(),
                                   "futures": futures,
                                   "summary": {"explored": count, "failures": len(failures),
-                                              "virtual_days": round(virtual_days, 1)}}, indent=2) + "\n")
+                                              "virtual_days": round(virtual_days, 1),
+                                              "coverage": future_coverage(
+                                                  [generate_future(seed) for seed in range(seed_start, seed_start + count)])}}, indent=2) + "\n")
     print(f"Futures explored: {count}")
     print(f"Failures found: {len(failures)}")
     print(f"Run saved: {output}")
@@ -164,7 +179,9 @@ async def solari_run(count: int, seed_start: int, output: Path):
                                   "futures": results,
                                   "summary": {"explored": len(results), "failures": len(failing_seeds),
                                               "patched_replays": len(patched),
-                                              "virtual_days": round(sum(event_span_days(generate_future(seed)) for seed in range(seed_start, seed_start + count)), 1)}}, indent=2) + "\n")
+                                              "virtual_days": round(sum(event_span_days(generate_future(seed)) for seed in range(seed_start, seed_start + count)), 1),
+                                              "coverage": future_coverage(
+                                                  [generate_future(seed) for seed in range(seed_start, seed_start + count)])}}, indent=2) + "\n")
     print("Solari exploration")
     print(f"Isolated futures: {len(results)} (sandbox + browser per future, run concurrently)")
     print(f"Failures found: {len(failing_seeds)}")
