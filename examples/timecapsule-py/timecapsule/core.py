@@ -155,12 +155,15 @@ def observed_violation(trace: list[dict[str, Any]]) -> dict[str, Any] | None:
             webhook_seen = True
         elif action in {"agent/original", "agent/fixed"} and item.get("sent"):
             if payment_seen and not webhook_seen:
-                return {
+                violation = {
                     "payment_status": str(item.get("payment", "paid")).upper(),
                     "crm_status": str(item.get("crm", "overdue")).upper(),
                     "agent_belief": str(item.get("crm", "overdue")).upper(),
                     "message": "Your payment remains overdue.",
                 }
+                if item.get("at"):
+                    violation["at"] = item["at"]
+                return violation
     return None
 
 

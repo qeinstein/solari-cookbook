@@ -6,7 +6,7 @@ import unittest
 from urllib.request import Request, urlopen
 
 from dashboard.server import make_handler
-from main import future_coverage, local_run
+from main import future_coverage, local_run, timestamp_observed_trace
 from timecapsule.core import (
     comparison,
     execute,
@@ -68,6 +68,21 @@ class ProductLoopTests(unittest.TestCase):
 
         self.assertFalse(observed_invariant_holds(fixed_agent_bug))
         self.assertEqual(observed_violation(fixed_agent_bug)["crm_status"], "OVERDUE")
+
+    def test_browser_trace_is_bound_to_virtual_event_time(self):
+        events = generate_future(0)
+        trace = [
+            {"action": "agent/original", "sent": True},
+            {"action": "pay"},
+            {"action": "agent/original", "sent": True, "payment": "paid", "crm": "overdue"},
+            {"action": "agent/original", "sent": True, "payment": "paid", "crm": "overdue"},
+            {"action": "webhook"},
+        ]
+
+        timestamped = timestamp_observed_trace(trace, events)
+
+        self.assertEqual(timestamped[2]["at"], events[3].at.isoformat())
+        self.assertEqual(observed_violation(timestamped)["at"], events[3].at.isoformat())
 
     def test_dashboard_surfaces_agent_belief_and_documentation_link(self):
         page = Path(__file__).parents[1] / "dashboard/app/page.tsx"

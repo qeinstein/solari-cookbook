@@ -82,6 +82,29 @@ async def read_world_trace(page):
     return json.loads(await page.locator("#trace").inner_text())
 
 
+def timestamp_observed_trace(trace, events, fixed=False):
+    """Bind each browser-observed action to the virtual event that drove it."""
+    agent_action = f"agent/{'fixed' if fixed else 'original'}"
+    expected = [
+        (event, {
+            "customer_payment": "pay",
+            "agent_wakeup": agent_action,
+            "payment_webhook": "webhook",
+        }[event.kind])
+        for event in events
+        if event.kind != "invoice_created"
+    ]
+    if len(trace) != len(expected):
+        raise RuntimeError(f"observed {len(trace)} actions for {len(expected)} temporal events")
+    for item, (event, expected_action) in zip(trace, expected):
+        if item.get("action") != expected_action:
+            raise RuntimeError(
+                f"observed action {item.get('action')} where {expected_action} was expected"
+            )
+        item["at"] = event.at.isoformat()
+    return trace
+
+
 def serializable_world(world):
     return {
         "payment_status": world.payment_status,
@@ -176,7 +199,7 @@ async def solari_future(seed: int, fixed: bool = False, recording_dir: Path | No
                     messages = await page.locator("#messages").inner_text()
                     payment = await page.locator("#payment").inner_text()
                     crm = await page.locator("#crm").inner_text()
-                    trace = await read_world_trace(page)
+                    trace = timestamp_observed_trace(await read_world_trace(page), events, fixed=fixed)
                     failed = not observed_invariant_holds(trace)
                     result = {"future_id": f"future-{seed}", "seed": seed, "status": "FAIL" if failed else "PASS",
                               "agent": "fixed" if fixed else "original", "sandbox_id": sandbox.sandboxId,
