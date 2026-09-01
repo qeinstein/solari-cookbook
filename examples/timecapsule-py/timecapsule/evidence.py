@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from .core import Event, future_fingerprint
+from .core import Event, event_sort_key, future_fingerprint
 
 
 WORLD_CONTRACT = "collections-world-v2"
@@ -45,12 +45,13 @@ def world_asset_hash() -> str:
 
 
 def environment_manifest(events: list[Event], policy: str) -> dict[str, Any]:
+    canonical_events = sorted(events, key=event_sort_key)
     inputs = {
         "world_contract": WORLD_CONTRACT,
         "world_asset_hash": world_asset_hash(),
         "initial_state": INITIAL_STATE,
         "invoice_fixture": INVOICE_FIXTURE,
-        "events": [event.as_dict() for event in events],
+        "events": [event.as_dict() for event in canonical_events],
     }
     return {
         "environment_hash": _hash(inputs),

@@ -11,7 +11,11 @@ from time import perf_counter
 
 from .core import (
     INVARIANT_ID,
+    event_sort_key,
+    execute,
     future_fingerprint,
+    invariant_holds,
+    invariant_violations,
     observed_invariant_holds,
     observed_violation,
     observed_violations,
@@ -61,18 +65,126 @@ def timestamp_observed_trace(trace, events, fixed=False):
     agent_action = f"agent/{'fixed' if fixed else 'original'}"
     expected = [
         (event, agent_action if event.kind == "agent_wakeup" else EVENT_ACTIONS[event.kind])
-        for event in events
+        for event in sorted(events, key=event_sort_key)
         if event.kind != "invoice_created"
     ]
     if len(trace) != len(expected):
         raise RuntimeError(f"observed {len(trace)} actions for {len(expected)} temporal events")
-    for item, (event, expected_action) in zip(trace, expected):
+    timestamped = []
+    required_state = {
+        "payment",
+        "crm",
+        "dispute",
+        "crm_dispute",
+        "webhook_scheduled",
+        "dispute_webhook_scheduled",
+    }
+    for raw_item, (event, expected_action) in zip(trace, expected):
+        item = dict(raw_item)
         if item.get("action") != expected_action:
             raise RuntimeError(
                 f"observed action {item.get('action')} where {expected_action} was expected"
             )
+        missing = sorted(required_state - item.keys())
+        if missing:
+            raise RuntimeError(
+                f"observed {expected_action} action is missing state evidence: {', '.join(missing)}"
+            )
         item["at"] = event.at.isoformat()
-    return trace
+        timestamped.append(item)
+    return timestamped
+
+
+def browser_simulator_parity(observed, trace, events, fixed=False):
+    simulated = execute(events, fixed=fixed)
+    ordered_events = [
+        event for event in sorted(events, key=event_sort_key)
+        if event.kind != "invoice_created"
+    ]
+    if len(trace) != len(ordered_events):
+        raise RuntimeError(
+            f"observed {len(trace)} trace states for {len(ordered_events)} temporal events"
+        )
+    previous_message_count = 0
+    for index, (item, event) in enumerate(zip(trace, ordered_events)):
+        prefix = execute(
+            [
+                candidate
+                for candidate in sorted(events, key=event_sort_key)
+                if candidate.kind != "invoice_created"
+            ][: index + 1],
+            fixed=fixed,
+        )
+        browser_step_state = (
+            item["payment"],
+            item["crm"],
+            item["dispute"],
+            item["crm_dispute"],
+        )
+        simulator_step_state = (
+            prefix.payment_status,
+            prefix.invoice_status,
+            prefix.dispute_status,
+            prefix.crm_dispute_status,
+        )
+        if browser_step_state != simulator_step_state:
+            raise RuntimeError(
+                f"browser/simulator trace mismatch after {event.kind}: "
+                f"{browser_step_state} != {simulator_step_state}"
+            )
+        expected_payment_schedule = any(
+            candidate.kind == "customer_payment"
+            for candidate in ordered_events[: index + 1]
+        )
+        expected_dispute_schedule = any(
+            candidate.kind == "dispute_opened"
+            for candidate in ordered_events[: index + 1]
+        )
+        if item["webhook_scheduled"] != expected_payment_schedule:
+            raise RuntimeError(f"payment scheduling mismatch after {event.kind}")
+        if item["dispute_webhook_scheduled"] != expected_dispute_schedule:
+            raise RuntimeError(f"dispute scheduling mismatch after {event.kind}")
+        if event.kind == "agent_wakeup":
+            actual_sent = bool(item.get("sent"))
+            expected_sent = len(prefix.messages) > previous_message_count
+            if actual_sent != expected_sent:
+                raise RuntimeError(f"agent send mismatch after {event.kind}")
+        previous_message_count = len(prefix.messages)
+    browser_state = (
+        observed["payment"].lower(),
+        observed["crm"].lower(),
+        observed["dispute"].lower(),
+        observed["crm_dispute"].lower(),
+    )
+    simulator_state = (
+        simulated.payment_status,
+        simulated.invoice_status,
+        simulated.dispute_status,
+        simulated.crm_dispute_status,
+    )
+    browser_message_count = observed.get("message_count")
+    if browser_message_count is None:
+        browser_message_count = 0 if observed["messages"] == "No messages sent." else len(observed["messages"].splitlines())
+    simulator_modes = sorted({item["type"] for item in invariant_violations(simulated)})
+    observed_modes = sorted({item["type"] for item in observed_violations(trace)})
+    if browser_state != simulator_state:
+        raise RuntimeError(f"browser/simulator state mismatch: {browser_state} != {simulator_state}")
+    if browser_message_count != len(simulated.messages):
+        raise RuntimeError(
+            f"browser/simulator message mismatch: {browser_message_count} != {len(simulated.messages)}"
+        )
+    if observed_modes != simulator_modes:
+        raise RuntimeError(f"browser/simulator violation mismatch: {observed_modes} != {simulator_modes}")
+    if observed_invariant_holds(trace) != invariant_holds(simulated):
+        raise RuntimeError("browser/simulator invariant result mismatch")
+    return {
+        "verified": True,
+        "trace_state_match": True,
+        "state_match": True,
+        "message_count_match": True,
+        "violation_match": True,
+        "simulator_failure_modes": simulator_modes,
+    }
 
 
 async def solari_future(
@@ -135,6 +247,7 @@ async def solari_future(
                         "dispute": await page.locator("#dispute").inner_text(),
                         "crm_dispute": await page.locator("#crm-dispute").inner_text(),
                         "messages": await page.locator("#messages").inner_text(),
+                        "message_count": int(await page.locator("#messages").get_attribute("data-message-count") or "-1"),
                     }
                     trace = timestamp_observed_trace(
                         await read_world_trace(page),
@@ -142,6 +255,7 @@ async def solari_future(
                         fixed=fixed,
                     )
                     observed["trace"] = trace
+                    parity = browser_simulator_parity(observed, trace, future.events, fixed=fixed)
                     violations = observed_violations(trace)
                     result = {
                         "future_id": future.future_id,
@@ -167,6 +281,7 @@ async def solari_future(
                         },
                         "observed": observed,
                         "recording_keyframes": trace,
+                        "browser_simulator_parity": parity,
                     }
                     await asyncio.sleep(2)
                 if recording_dir and browser_session_id:
@@ -233,9 +348,15 @@ async def solari_run(
         if candidate:
             result["counterfactual_proof"]["runtime"] = {
                 "same_event_hash": candidate["input_hash"] == result["input_hash"],
-                "fresh_isolation": candidate["sandbox_id"] != result["sandbox_id"],
+                "same_environment_hash": candidate["counterfactual_proof"]["original"]["environment_hash"] == result["counterfactual_proof"]["original"]["environment_hash"],
+                "fresh_isolation": (
+                    candidate["sandbox_id"] != result["sandbox_id"]
+                    and candidate["browser_session_id"] != result["browser_session_id"]
+                ),
                 "original_sandbox_id": result["sandbox_id"],
                 "patched_sandbox_id": candidate["sandbox_id"],
+                "original_browser_session_id": result["browser_session_id"],
+                "patched_browser_session_id": candidate["browser_session_id"],
             }
             result["patched_run"] = {
                 key: candidate[key]
@@ -251,6 +372,7 @@ async def solari_run(
                     "recording_status",
                     "recording_keyframes",
                     "observed",
+                    "browser_simulator_parity",
                 )
                 if key in candidate
             }

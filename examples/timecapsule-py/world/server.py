@@ -38,6 +38,8 @@ def snapshot(action, **extra):
         "crm": STATE["crm"],
         "dispute": STATE["dispute"],
         "crm_dispute": STATE["crm_dispute"],
+        "webhook_scheduled": STATE["webhook_scheduled"],
+        "dispute_webhook_scheduled": STATE["dispute_webhook_scheduled"],
         **extra,
     }
 

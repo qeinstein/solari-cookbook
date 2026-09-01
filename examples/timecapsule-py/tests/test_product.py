@@ -1,4 +1,5 @@
 import json
+from datetime import timedelta
 from pathlib import Path
 import tempfile
 from threading import Thread
@@ -8,6 +9,7 @@ from urllib.request import Request, urlopen
 from dashboard.server import make_handler
 from main import future_coverage, local_run, timestamp_observed_trace
 from timecapsule.core import (
+    Event,
     comparison,
     execute,
     future_fingerprint,
@@ -46,6 +48,7 @@ class ProductLoopTests(unittest.TestCase):
         self.assertIn('id="crm-dispute"', text)
         self.assertIn('id="sync-status"', text)
         self.assertIn('id="trace"', text)
+        self.assertIn("data-message-count", text)
 
     def test_generator_explores_multiple_temporal_shapes(self):
         futures = [generate_future(seed) for seed in range(250)]
@@ -118,11 +121,45 @@ class ProductLoopTests(unittest.TestCase):
         self.assertEqual(payment_boundary["resolution_minutes"], 1)
         self.assertEqual(dispute_boundary["resolution_minutes"], 1)
 
+    def test_equal_timestamp_sync_is_processed_before_agent_wakeup(self):
+        events = Scenario(1, 540, (540,)).events()
+        self.assertTrue(invariant_holds(execute(events)))
+        self.assertEqual(find_failure_boundaries(Scenario(1, 720, (540,)).events())[0]["first_failing_minutes"], 541)
+
+    def test_missing_sync_is_not_reported_as_a_delayed_webhook_race(self):
+        start = Scenario(1, 0, ()).events()[0].at
+        events = [
+            Event(start, "invoice_created"),
+            Event(start + timedelta(minutes=10), "customer_payment", {"webhook_delay_hours": 2}),
+            Event(start + timedelta(minutes=20), "agent_wakeup"),
+        ]
+        self.assertTrue(invariant_holds(execute(events)))
+        self.assertEqual(minimize(events), events)
+
     def test_fixed_agent_suppresses_active_dispute_contact(self):
         events = Scenario(1, 0, (-180,), -360, 1440).events()
         self.assertFalse(invariant_holds(execute(events)))
         self.assertTrue(invariant_holds(execute(events, fixed=True)))
         self.assertEqual(comparison(events), {"original": "FAIL", "patched": "PASS"})
+
+    def test_duplicate_source_events_cannot_hide_an_earlier_unsafe_contact(self):
+        start = Scenario(1, 0, ()).events()[0].at
+        events = [
+            Event(start, "invoice_created"),
+            Event(start + timedelta(minutes=10), "customer_payment", {"webhook_delay_hours": 2}),
+            Event(start + timedelta(minutes=20), "agent_wakeup"),
+            Event(start + timedelta(minutes=30), "customer_payment", {"webhook_delay_hours": 2}),
+            Event(start + timedelta(minutes=40), "payment_webhook"),
+            Event(start + timedelta(minutes=50), "payment_webhook"),
+        ]
+        self.assertFalse(invariant_holds(execute(events)))
+        self.assertEqual(observed_violation([{
+            "action": "agent/original",
+            "sent": True,
+            "payment": "paid",
+            "crm": "overdue",
+            "at": (start + timedelta(minutes=20)).isoformat(),
+        }])["type"], "stale_payment_contact")
 
     def test_minimizer_preserves_the_selected_failure_class(self):
         events = Scenario(1, 0, (-180,), -360, 1440).events()
@@ -159,12 +196,22 @@ class ProductLoopTests(unittest.TestCase):
 
     def test_browser_trace_is_bound_to_virtual_event_time(self):
         events = generate_future(0)
+        def snapshot(**changes):
+            return {
+                "payment": "unpaid",
+                "crm": "overdue",
+                "dispute": "none",
+                "crm_dispute": "none",
+                "webhook_scheduled": False,
+                "dispute_webhook_scheduled": False,
+                **changes,
+            }
         trace = [
-            {"action": "agent/original", "sent": True},
-            {"action": "pay"},
-            {"action": "agent/original", "sent": True, "payment": "paid", "crm": "overdue"},
-            {"action": "agent/original", "sent": True, "payment": "paid", "crm": "overdue"},
-            {"action": "webhook"},
+            {"action": "agent/original", "sent": True, **snapshot()},
+            {"action": "pay", **snapshot(payment="paid", webhook_scheduled=True)},
+            {"action": "agent/original", "sent": True, **snapshot(payment="paid", webhook_scheduled=True)},
+            {"action": "agent/original", "sent": True, **snapshot(payment="paid", webhook_scheduled=True)},
+            {"action": "webhook", **snapshot(payment="paid", crm="paid", webhook_scheduled=True)},
         ]
 
         timestamped = timestamp_observed_trace(trace, events)
@@ -178,9 +225,10 @@ class ProductLoopTests(unittest.TestCase):
         tree = Path(__file__).parents[1] / "dashboard/components/FutureTree.tsx"
         self.assertIn("Agent belief", inspector.read_text())
         self.assertIn("Same future manifest", inspector.read_text())
-        self.assertIn("fresh sandbox for patched replay", inspector.read_text())
+        self.assertIn("fresh sandbox and browser for patched replay", inspector.read_text())
         self.assertIn("parent_future_id", tree.read_text())
         self.assertIn('className="docs-link"', page.read_text())
+        self.assertIn("actionError && selected && actionError.futureId === selected.future_id", page.read_text())
 
     def test_local_run_persists_patch_outcomes(self):
         with tempfile.TemporaryDirectory() as directory:

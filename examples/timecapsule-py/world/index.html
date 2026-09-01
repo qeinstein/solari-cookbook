@@ -17,3 +17,12 @@
   async function runAction(action) { const buttons=[...document.querySelectorAll('button')]; buttons.forEach(button=>button.disabled=true); markSync('busy',action); try { const response=await fetch('/'+action,{method:'POST'}); if(!response.ok) throw new Error('action unavailable'); await refresh(); markSync('ready',action); } catch(error) { markSync('error',action); throw error; } finally { buttons.forEach(button=>button.disabled=false); } }
   document.querySelectorAll('button').forEach(button=>button.onclick=()=>{ actionQueue=actionQueue.then(()=>runAction(button.dataset.action)).catch(()=>refresh()); }); refresh().catch(()=>markSync('error','initial'));
 </script>
+<script>
+  const messages = document.querySelector('#messages');
+  const syncMessageCount = () => {
+    const text = messages.textContent || '';
+    messages.dataset.messageCount = text === 'No messages sent.' ? '0' : String(text.split('\n').length);
+  };
+  new MutationObserver(syncMessageCount).observe(messages, { childList: true, characterData: true, subtree: true });
+  syncMessageCount();
+</script>

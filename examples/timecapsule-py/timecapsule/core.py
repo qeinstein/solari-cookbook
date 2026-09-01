@@ -18,6 +18,23 @@ KNOWN_EVENT_KINDS = {
     "dispute_webhook",
     "agent_wakeup",
 }
+EVENT_PRIORITY = {
+    "invoice_created": 0,
+    "customer_payment": 1,
+    "dispute_opened": 2,
+    "payment_webhook": 3,
+    "dispute_webhook": 4,
+    "agent_wakeup": 5,
+}
+
+
+def event_sort_key(event: Event):
+    """Make equal-time actions deterministic, including duplicate events."""
+    return (
+        event.at,
+        EVENT_PRIORITY.get(event.kind, len(EVENT_PRIORITY)),
+        json.dumps(event.payload, sort_keys=True, separators=(",", ":")),
+    )
 
 
 @dataclass(frozen=True)
@@ -92,6 +109,8 @@ class CollectionsAgent:
             "invoice_status": world.invoice_status,
             "dispute_status": world.dispute_status,
             "crm_dispute_status": world.crm_dispute_status,
+            "payment_webhook_scheduled": world.webhook_scheduled,
+            "dispute_webhook_scheduled": world.dispute_webhook_scheduled,
         })
         world.trace.append({"at": world.now.isoformat(), "agent": "sent_overdue_reminder"})
 
@@ -100,7 +119,7 @@ def run_future(events: list[Event], agent: CollectionsAgent) -> World:
     world = World(now=min((event.at for event in events), default=datetime(2026, 9, 1, 9)))
     world.webhook_scheduled = any(event.kind == "payment_webhook" for event in events)
     world.dispute_webhook_scheduled = any(event.kind == "dispute_webhook" for event in events)
-    for event in sorted(events, key=lambda event: event.at):
+    for event in sorted(events, key=event_sort_key):
         world.apply(event)
         if event.kind == "agent_wakeup":
             agent.wake(world)
@@ -111,11 +130,13 @@ def invariant_violations(world: World) -> list[dict[str, Any]]:
     """Return every unsafe contact caused by stale external collections state."""
     violations = []
     for message in world.messages:
+        # Evaluate the state captured at the wakeup, not the world's final
+        # source timestamps. This remains correct if an adversarial future
+        # contains duplicate payments or disputes after the unsafe contact.
         if (
-            world.webhook_scheduled
-            and world.payment_at is not None
-            and world.webhook_due_at is not None
-            and world.payment_at <= message["at"] < world.webhook_due_at
+            message.get("payment_webhook_scheduled")
+            and message["payment_status"] == "paid"
+            and message["invoice_status"] == "overdue"
         ):
             violations.append({
                 "type": "stale_payment_contact",
@@ -130,10 +151,9 @@ def invariant_violations(world: World) -> list[dict[str, Any]]:
                 "message": "Your payment remains overdue.",
             })
         if (
-            world.dispute_webhook_scheduled
-            and world.dispute_at is not None
-            and world.dispute_webhook_due_at is not None
-            and world.dispute_at <= message["at"] < world.dispute_webhook_due_at
+            message.get("dispute_webhook_scheduled")
+            and message["dispute_status"] == "open"
+            and message["crm_dispute_status"] != "open"
         ):
             violations.append({
                 "type": "active_dispute_contact",
@@ -174,7 +194,7 @@ def generate_future(seed: int, start=datetime(2026, 9, 1, 9)) -> list[Event]:
         Event(payment + timedelta(hours=delay), "payment_webhook"),
         *(Event(payment + timedelta(hours=offset), "agent_wakeup") for offset in wake_offsets),
     ]
-    return sorted(events, key=lambda event: event.at)
+    return sorted(events, key=event_sort_key)
 
 
 def temporal_windows(events: list[Event]) -> set[str]:
@@ -195,7 +215,7 @@ def temporal_windows(events: list[Event]) -> set[str]:
 
 def future_fingerprint(events: list[Event]) -> str:
     encoded = json.dumps(
-        [event.as_dict() for event in events],
+        [event.as_dict() for event in sorted(events, key=event_sort_key)],
         sort_keys=True,
         separators=(",", ":"),
     ).encode()
@@ -207,7 +227,11 @@ def observed_violations(trace: list[dict[str, Any]]) -> list[dict[str, Any]]:
     for item in trace:
         if item.get("action") not in {"agent/original", "agent/fixed"} or not item.get("sent"):
             continue
-        if item.get("payment") == "paid" and item.get("crm") == "overdue":
+        if (
+            item.get("payment") == "paid"
+            and item.get("crm") == "overdue"
+            and item.get("webhook_scheduled", True)
+        ):
             violations.append({
                 "type": "stale_payment_contact",
                 "title": "Contact after payment",
@@ -220,7 +244,11 @@ def observed_violations(trace: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "agent_belief": "OVERDUE",
                 "message": "Your payment remains overdue.",
             })
-        if item.get("dispute") == "open" and item.get("crm_dispute") != "open":
+        if (
+            item.get("dispute") == "open"
+            and item.get("crm_dispute") != "open"
+            and item.get("dispute_webhook_scheduled", True)
+        ):
             violations.append({
                 "type": "active_dispute_contact",
                 "title": "Contact during an active dispute",
@@ -287,8 +315,11 @@ def comparison(events: list[Event]):
 
 
 def save_future(path: Path, events: list[Event], result=None):
+    computed = comparison(events)
+    if result is not None and result != computed:
+        raise ValueError(f"supplied regression result {result} does not match {computed}")
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps({"events": [event.as_dict() for event in events], "result": result or comparison(events)}, indent=2) + "\n")
+    path.write_text(json.dumps({"events": [event.as_dict() for event in sorted(events, key=event_sort_key)], "result": computed}, indent=2) + "\n")
 
 
 def load_future(path: Path) -> list[Event]:

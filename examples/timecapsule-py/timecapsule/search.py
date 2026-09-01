@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 import random
 from typing import Any
 
-from .core import Event, execute, future_fingerprint, invariant_violations
+from .core import Event, event_sort_key, execute, future_fingerprint, invariant_violations
 
 
 START = datetime(2026, 9, 1, 9)
@@ -50,7 +50,7 @@ class Scenario:
             Event(payment + timedelta(minutes=offset), "agent_wakeup")
             for offset in self.wake_offsets
         )
-        return sorted(events, key=lambda event: event.at)
+        return sorted(events, key=event_sort_key)
 
 
 @dataclass
@@ -74,7 +74,10 @@ class SearchResult:
 
 
 def seed_scenario(seed: int) -> Scenario:
-    rng = random.Random(seed)
+    return _scenario_from_rng(random.Random(seed))
+
+
+def _scenario_from_rng(rng: random.Random) -> Scenario:
     wake_count = rng.choice((1, 2, 2, 3))
     dispute_enabled = rng.random() < 0.5
     return Scenario(
@@ -144,8 +147,8 @@ def coverage_features(events: list[Event]) -> set[str]:
     features = {f"kind:{event.kind}" for event in events}
     kinds = [event.kind for event in events]
     features.update(f"pair:{left}>{right}" for left, right in zip(kinds, kinds[1:]))
-    payment = next(event for event in events if event.kind == "customer_payment")
-    payment_webhook = next(event for event in events if event.kind == "payment_webhook")
+    payment = _single_event(events, "customer_payment")
+    payment_webhook = _single_event(events, "payment_webhook")
     payment_delay = int((payment_webhook.at - payment.at).total_seconds() / 60)
     features.add(f"payment-delay:{_bucket(payment_delay)}")
     wakes = [event for event in events if event.kind == "agent_wakeup"]
@@ -153,8 +156,10 @@ def coverage_features(events: list[Event]) -> set[str]:
     for wake in wakes:
         window = "before" if wake.at < payment.at else "stale" if wake.at < payment_webhook.at else "after"
         features.add(f"payment-window:{window}")
-    dispute = next((event for event in events if event.kind == "dispute_opened"), None)
-    dispute_webhook = next((event for event in events if event.kind == "dispute_webhook"), None)
+    dispute = _optional_single_event(events, "dispute_opened")
+    dispute_webhook = _optional_single_event(events, "dispute_webhook")
+    if (dispute is None) != (dispute_webhook is None):
+        raise ValueError("dispute_opened and dispute_webhook must be provided together")
     if dispute and dispute_webhook:
         delay = int((dispute_webhook.at - dispute.at).total_seconds() / 60)
         features.add(f"dispute-delay:{_bucket(delay)}")
@@ -256,7 +261,8 @@ def _with_webhook_delay(events: list[Event], mode: str, minutes: int) -> list[Ev
         source_kind, webhook_kind = "dispute_opened", "dispute_webhook"
     else:
         raise ValueError(f"unsupported failure mode: {mode}")
-    source = next(event for event in events if event.kind == source_kind)
+    source = _single_event(events, source_kind)
+    _single_event(events, webhook_kind)
     adjusted = []
     for event in events:
         if event.kind == source_kind:
@@ -270,7 +276,21 @@ def _with_webhook_delay(events: list[Event], mode: str, minutes: int) -> list[Ev
             adjusted.append(Event(source.at + timedelta(minutes=minutes), event.kind, dict(event.payload)))
         else:
             adjusted.append(event)
-    return sorted(adjusted, key=lambda event: event.at)
+    return sorted(adjusted, key=event_sort_key)
+
+
+def _single_event(events: list[Event], kind: str) -> Event:
+    matches = [event for event in events if event.kind == kind]
+    if len(matches) != 1:
+        raise ValueError(f"expected exactly one {kind} event, found {len(matches)}")
+    return matches[0]
+
+
+def _optional_single_event(events: list[Event], kind: str) -> Event | None:
+    matches = [event for event in events if event.kind == kind]
+    if len(matches) > 1:
+        raise ValueError(f"expected at most one {kind} event, found {len(matches)}")
+    return matches[0] if matches else None
 
 
 def _fails_with(events: list[Event], mode: str) -> bool:
@@ -291,12 +311,12 @@ def find_failure_boundaries(events: list[Event]) -> list[dict[str, Any]]:
     modes = sorted({item["type"] for item in invariant_violations(execute(events))})
     for mode in modes:
         if mode == "stale_payment_contact":
-            source = next(event for event in events if event.kind == "customer_payment")
-            webhook = next(event for event in events if event.kind == "payment_webhook")
+            source = _single_event(events, "customer_payment")
+            webhook = _single_event(events, "payment_webhook")
             label = "Payment webhook lag"
         else:
-            source = next(event for event in events if event.kind == "dispute_opened")
-            webhook = next(event for event in events if event.kind == "dispute_webhook")
+            source = _single_event(events, "dispute_opened")
+            webhook = _single_event(events, "dispute_webhook")
             label = "Dispute webhook lag"
         high = int((webhook.at - source.at).total_seconds() / 60)
         if high <= 0 or not _fails_with(_with_webhook_delay(events, mode, high), mode):

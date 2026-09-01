@@ -5,6 +5,7 @@ import asyncio
 from pathlib import Path
 import sys
 
+from timecapsule.benchmark import print_benchmark, run_benchmark, save_benchmark
 from timecapsule.core import comparison, load_future, minimize_for_violation, save_future
 from timecapsule.runner import future_coverage, local_run
 from timecapsule.solari_runner import solari_run, timestamp_observed_trace
@@ -56,6 +57,11 @@ def parser():
     cloud.add_argument("--seed", type=int, default=0)
     cloud.add_argument("--concurrency", type=int, default=1)
     cloud.add_argument("--output", type=Path, default=Path("runs/solari-latest.json"))
+    benchmark = commands.add_parser("benchmark", help="matched random vs coverage-guided search benchmark")
+    benchmark.add_argument("--trials", type=int, default=200)
+    benchmark.add_argument("--budget", type=int, default=128)
+    benchmark.add_argument("--seed", type=int, default=0)
+    benchmark.add_argument("--output", type=Path, default=Path("runs/search-benchmark.json"))
     for mode in ("replay", "minimize", "compare"):
         command = commands.add_parser(mode, help=f"{mode} a saved future")
         command.add_argument("future", type=Path)
@@ -70,6 +76,11 @@ def main():
         local_run(args.futures, args.seed, args.output)
     elif args.mode == "solari":
         asyncio.run(solari_run(args.futures, args.seed, args.output, args.concurrency))
+    elif args.mode == "benchmark":
+        report = run_benchmark(args.trials, args.budget, args.seed)
+        print_benchmark(report)
+        save_benchmark(args.output, report)
+        print(f"Benchmark saved: {args.output}")
     elif args.mode == "regress":
         raise SystemExit(regress(args.directory))
     else:
