@@ -1,0 +1,58 @@
+<svg width="1600" height="520" viewBox="0 0 1600 520" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title description">
+  <title id="title">TimeCapsule — find the failure boundary</title>
+  <desc id="description">A dark reliability workspace banner showing branching futures, a failure boundary, and a patched pass.</desc>
+  <defs>
+    <linearGradient id="background" x1="80" y1="40" x2="1530" y2="520" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0A1713"/>
+      <stop offset="0.56" stop-color="#14261F"/>
+      <stop offset="1" stop-color="#1D3026"/>
+    </linearGradient>
+    <linearGradient id="glow" x1="1250" y1="90" x2="1530" y2="420" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#B8D3A8" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#B8D3A8" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="16" stdDeviation="18" flood-color="#050B08" flood-opacity="0.34"/>
+    </filter>
+    <pattern id="grid" width="44" height="44" patternUnits="userSpaceOnUse">
+      <path d="M44 0H0V44" stroke="#B8D3A8" stroke-opacity="0.055"/>
+    </pattern>
+  </defs>
+
+  <rect width="1600" height="520" rx="30" fill="url(#background)"/>
+  <rect width="1600" height="520" rx="30" fill="url(#grid)"/>
+  <circle cx="1420" cy="130" r="360" fill="url(#glow)"/>
+  <path d="M0 444C284 385 429 484 696 422C986 355 1092 430 1600 326" stroke="#B8D3A8" stroke-opacity="0.1"/>
+  <path d="M0 468C284 409 429 508 696 446C986 379 1092 454 1600 350" stroke="#B8D3A8" stroke-opacity="0.055"/>
+
+  <g transform="translate(76 64)">
+    <text fill="#B8D3A8" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" letter-spacing="3.4">TIMECAPSULE  /  RELIABILITY WORKSPACE</text>
+    <text y="112" fill="#F5F2E8" font-family="Georgia, 'Times New Roman', serif" font-size="76" letter-spacing="-3.8">Find the failure</text>
+    <text y="194" fill="#F5F2E8" font-family="Georgia, 'Times New Roman', serif" font-size="76" letter-spacing="-3.8">boundary.</text>
+    <text y="246" fill="#B9C2B6" font-family="Arial, Helvetica, sans-serif" font-size="21">Explore alternate futures. Replay the one that breaks.</text>
+    <rect y="300" width="194" height="42" rx="21" fill="#B8D3A8"/>
+    <text x="25" y="327" fill="#102119" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="700" letter-spacing="1.5">FAIL  →  PROVE</text>
+  </g>
+
+  <g transform="translate(930 84)" filter="url(#shadow)">
+    <rect width="570" height="350" rx="22" fill="#0D1C17" fill-opacity="0.86" stroke="#AFC8A0" stroke-opacity="0.23"/>
+    <text x="32" y="38" fill="#AAB9A8" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700" letter-spacing="2.4">FUTURE TREE  /  INV-1842</text>
+    <path d="M54 112H194M194 112L292 78M194 112L292 148M292 78H418M292 148H418" stroke="#769176" stroke-width="2" stroke-linecap="round"/>
+    <circle cx="54" cy="112" r="9" fill="#B8D3A8"/>
+    <circle cx="194" cy="112" r="8" fill="#769176"/>
+    <circle cx="292" cy="78" r="8" fill="#E48C76"/>
+    <circle cx="292" cy="148" r="8" fill="#B8D3A8"/>
+    <circle cx="418" cy="78" r="9" fill="#E48C76"/>
+    <circle cx="418" cy="148" r="9" fill="#B8D3A8"/>
+    <text x="36" y="150" fill="#758B7A" font-family="Arial, Helvetica, sans-serif" font-size="11">seed</text>
+    <text x="266" y="58" fill="#D98C79" font-family="Arial, Helvetica, sans-serif" font-size="11">unsafe</text>
+    <text x="387" y="58" fill="#B8D3A8" font-family="Arial, Helvetica, sans-serif" font-size="11">minimized</text>
+    <text x="258" y="178" fill="#B8D3A8" font-family="Arial, Helvetica, sans-serif" font-size="11">patched</text>
+    <rect x="32" y="222" width="241" height="82" rx="14" fill="#241A19" stroke="#E48C76" stroke-opacity="0.5"/>
+    <text x="52" y="249" fill="#D98C79" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="700" letter-spacing="1.5">ORIGINAL</text>
+    <text x="52" y="279" fill="#F5F2E8" font-family="Georgia, 'Times New Roman', serif" font-size="23">FAIL</text>
+    <rect x="297" y="222" width="241" height="82" rx="14" fill="#17271E" stroke="#B8D3A8" stroke-opacity="0.5"/>
+    <text x="317" y="249" fill="#B8D3A8" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="700" letter-spacing="1.5">PATCHED</text>
+    <text x="317" y="279" fill="#F5F2E8" font-family="Georgia, 'Times New Roman', serif" font-size="23">PASS</text>
+  </g>
+</svg>
