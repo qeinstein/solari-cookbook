@@ -22,8 +22,8 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionResult, setActionResult] = useState<SelectedAction>(null);
-  const [actionError, setActionError] = useState("");
-  const [workingAction, setWorkingAction] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<{ futureId: string; message: string } | null>(null);
+  const [workingAction, setWorkingAction] = useState<{ futureId: string; action: FutureAction } | null>(null);
 
   const loadRun = useCallback(async () => {
     setLoading(true);
@@ -54,18 +54,19 @@ export default function Dashboard() {
   function selectFuture(future: Future) {
     setSelectedId(future.future_id);
     setActionResult(null);
-    setActionError("");
+    setActionError(null);
   }
 
   async function runAction(action: FutureAction) {
     if (!selected) return;
-    setWorkingAction(action);
-    setActionError("");
+    const futureId = selected.future_id;
+    setWorkingAction({ futureId, action });
+    setActionError(null);
     try {
-      const payload = await postFutureAction(selected.future_id, action);
-      setActionResult({ futureId: selected.future_id, action, payload });
+      const payload = await postFutureAction(futureId, action);
+      setActionResult({ futureId, action, payload });
     } catch (caught) {
-      setActionError(caught instanceof ApiError ? caught.message : "Action unavailable.");
+      setActionError({ futureId, message: caught instanceof ApiError ? caught.message : "Action unavailable." });
     } finally {
       setWorkingAction(null);
     }
@@ -110,7 +111,13 @@ export default function Dashboard() {
                 : futures.length === 0 ? <div className="empty"><strong>No saved run yet.</strong><span>Run <code>python3 main.py run --futures 25</code> first.</span></div>
                   : <FutureTree futures={futures} selectedId={selected?.future_id} onSelect={selectFuture} />}
           </section>
-          <Inspector future={selected} selectedAction={actionResult} workingAction={workingAction} actionError={actionError} onAction={(action) => void runAction(action)} />
+          <Inspector
+            future={selected}
+            selectedAction={actionResult}
+            workingAction={workingAction && selected && workingAction.futureId === selected.future_id ? workingAction.action : null}
+            actionError={actionError && selected && actionError.futureId === selected.future_id ? actionError.message : ""}
+            onAction={(action) => void runAction(action)}
+          />
         </div>
 
         <RunSummary data={data} />

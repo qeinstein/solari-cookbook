@@ -55,9 +55,12 @@ export type CounterfactualProof = {
   patched: EnvironmentManifest;
   runtime?: {
     same_event_hash?: boolean;
+    same_environment_hash?: boolean;
     fresh_isolation?: boolean;
     original_sandbox_id?: string;
     patched_sandbox_id?: string;
+    original_browser_session_id?: string;
+    patched_browser_session_id?: string;
   };
 };
 
@@ -67,7 +70,17 @@ export type ObservedState = {
   dispute?: string;
   crm_dispute?: string;
   messages?: string;
+  message_count?: number;
   trace?: Array<Record<string, unknown>>;
+};
+
+export type BrowserSimulatorParity = {
+  verified?: boolean;
+  trace_state_match?: boolean;
+  state_match?: boolean;
+  message_count_match?: boolean;
+  violation_match?: boolean;
+  simulator_failure_modes?: string[];
 };
 
 export type PatchedRun = {
@@ -82,6 +95,7 @@ export type PatchedRun = {
   recording_events?: number;
   recording_keyframes?: Array<Record<string, unknown>>;
   observed?: ObservedState;
+  browser_simulator_parity?: BrowserSimulatorParity;
 };
 
 export type Future = {
@@ -101,6 +115,7 @@ export type Future = {
   invoice_status?: string;
   messages?: Array<Record<string, unknown>>;
   observed?: ObservedState;
+  browser_simulator_parity?: BrowserSimulatorParity;
   sandbox_id?: string;
   browser_session_id?: string;
   recording_status?: string;

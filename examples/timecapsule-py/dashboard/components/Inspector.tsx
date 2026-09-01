@@ -75,7 +75,7 @@ function CounterfactualDiff({ proof }: { proof?: CounterfactualProof }) {
       <div className="diff-row"><span>World assets</span><code>{shortHash(proof.original.world_asset_hash)}</code><strong>=</strong><code>{shortHash(proof.patched.world_asset_hash)}</code></div>
       <div className="diff-row changed"><span>Agent policy</span><code>{proof.only_change.original}</code><strong>→</strong><code>{proof.only_change.patched}</code></div>
       <p>All {proof.identical_fields.length} environment inputs match. Only <code>agent_policy</code> changes.</p>
-      {proof.runtime?.same_event_hash && proof.runtime.fresh_isolation ? <p className="runtime-proof">Runtime verified · same event hash · fresh sandbox for patched replay.</p> : null}
+      {proof.runtime?.same_event_hash && proof.runtime.same_environment_hash && proof.runtime.fresh_isolation ? <p className="runtime-proof">Runtime verified · same input/environment · fresh sandbox and browser for patched replay.</p> : null}
     </div>
   );
 }
@@ -142,6 +142,7 @@ export function Inspector({
       <Timeline events={events} violationAt={violation?.at} />
       {future?.status === "FAIL" ? <div className="proof-flow" id="evidence"><div><span>Original</span><strong className="fail">FAIL</strong></div><span>→</span><div><span>Minimize</span><strong>{action?.action === "minimize" ? `${action.payload.before_events}→${action.payload.events}` : "ready"}</strong></div><span>→</span><div><span>Patched</span><strong className="pass">{future.comparison?.patched ?? "—"}</strong></div></div> : null}
       <CounterfactualDiff proof={proof} />
+      {future?.browser_simulator_parity?.verified ? <p className="runtime-proof">Browser and simulator agree on final state, message count, and failure class.</p> : null}
       {future ? <RecordingEvidence future={future} /> : null}
     </aside>
   );
