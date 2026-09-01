@@ -1,4 +1,4 @@
-"""TimeCapsule CLI: coverage-guided local proof and real Solari execution."""
+"""TimeCapsule CLI: coverage-guided local proof and isolated execution."""
 
 import argparse
 import asyncio
@@ -52,11 +52,15 @@ def parser():
     local.add_argument("--futures", type=int, default=25)
     local.add_argument("--seed", type=int, default=0)
     local.add_argument("--output", type=Path, default=Path("runs/latest.json"))
-    cloud = commands.add_parser("solari", help="run isolated futures in Solari")
+    cloud = commands.add_parser(
+        "cloud",
+        aliases=["solari"],
+        help="run isolated futures in a managed browser runtime",
+    )
     cloud.add_argument("--futures", type=int, default=3)
     cloud.add_argument("--seed", type=int, default=0)
     cloud.add_argument("--concurrency", type=int, default=1)
-    cloud.add_argument("--output", type=Path, default=Path("runs/solari-latest.json"))
+    cloud.add_argument("--output", type=Path, default=Path("runs/cloud-latest.json"))
     benchmark = commands.add_parser("benchmark", help="matched random vs coverage-guided search benchmark")
     benchmark.add_argument("--trials", type=int, default=200)
     benchmark.add_argument("--budget", type=int, default=128)
@@ -74,7 +78,7 @@ def main():
     args = parser().parse_args()
     if args.mode in {"run", "local"}:
         local_run(args.futures, args.seed, args.output)
-    elif args.mode == "solari":
+    elif args.mode in {"cloud", "solari"}:
         asyncio.run(solari_run(args.futures, args.seed, args.output, args.concurrency))
     elif args.mode == "benchmark":
         report = run_benchmark(args.trials, args.budget, args.seed)

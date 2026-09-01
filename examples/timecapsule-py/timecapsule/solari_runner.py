@@ -1,4 +1,4 @@
-"""Solari sandbox/browser execution for coverage-guided temporal futures."""
+"""Isolated browser execution for coverage-guided temporal futures."""
 
 from __future__ import annotations
 
@@ -32,6 +32,13 @@ EVENT_ACTIONS = {
     "dispute_opened": "dispute",
     "dispute_webhook": "dispute-webhook",
 }
+
+
+def cloud_api_key():
+    key = os.environ.get("TIMECAPSULE_CLOUD_KEY") or os.environ.get("SOLARI_API_KEY")
+    if not key:
+        raise SystemExit("TIMECAPSULE_CLOUD_KEY is required for cloud mode")
+    return key
 
 
 async def goto_preview(page, preview_url: str):
@@ -196,8 +203,9 @@ async def solari_future(
     from solari_browser.errors import SolariError
     from solari_sandbox import SandboxClient
 
+    api_key = cloud_api_key()
     sandbox_client = SandboxClient(
-        api_key=os.environ["SOLARI_API_KEY"],
+        api_key=api_key,
         base_url="https://api.getsolari.com",
     )
     async with sandbox_client:
@@ -220,7 +228,7 @@ async def solari_future(
             )
             preview_url = (await sandbox.preview_url(8765))["url"]
 
-            async with Solari(api_key=os.environ["SOLARI_API_KEY"]) as solari:
+            async with Solari(api_key=api_key) as solari:
                 browser_session_id = None
                 result = None
                 async with await solari.launch(recording=True) as browser:
@@ -316,8 +324,7 @@ async def solari_run(
     output: Path,
     concurrency: int = 1,
 ):
-    if not os.environ.get("SOLARI_API_KEY"):
-        raise SystemExit("SOLARI_API_KEY is required for Solari mode")
+    cloud_api_key()
     if concurrency < 1:
         raise SystemExit("--concurrency must be at least 1")
     started = perf_counter()
