@@ -19,6 +19,7 @@
 </script>
 <script>
   const messages = document.querySelector('#messages');
+  messages.setAttribute('data-message-count', '0');
   const syncMessageCount = () => {
     const text = messages.textContent || '';
     messages.dataset.messageCount = text === 'No messages sent.' ? '0' : String(text.split('\n').length);
