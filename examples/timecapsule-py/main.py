@@ -13,6 +13,13 @@ from timecapsule.core import comparison, execute, generate_future, invariant_hol
 ROOT = Path(__file__).parent
 
 
+def event_span_days(events):
+    """Return the measured elapsed time covered by one generated future."""
+    if len(events) < 2:
+        return 0
+    return (events[-1].at - events[0].at).total_seconds() / 86400
+
+
 def serializable_world(world):
     return {
         "payment_status": world.payment_status,
@@ -25,8 +32,10 @@ def serializable_world(world):
 def local_run(count: int, seed_start: int, output: Path):
     futures = []
     failures = []
+    virtual_days = 0
     for seed in range(seed_start, seed_start + count):
         events = generate_future(seed)
+        virtual_days += event_span_days(events)
         world = execute(events)
         entry = {"future_id": f"future-{seed}", "seed": seed, "agent": "original",
                  "status": "PASS" if invariant_holds(world) else "FAIL",
@@ -39,7 +48,8 @@ def local_run(count: int, seed_start: int, output: Path):
     output.write_text(json.dumps({"run_id": f"local-{seed_start}-{seed_start + count - 1}",
                                   "started_at": datetime.now().astimezone().isoformat(),
                                   "futures": futures,
-                                  "summary": {"explored": count, "failures": len(failures)}}, indent=2) + "\n")
+                                  "summary": {"explored": count, "failures": len(failures),
+                                              "virtual_days": round(virtual_days, 1)}}, indent=2) + "\n")
     print(f"Futures explored: {count}")
     print(f"Failures found: {len(failures)}")
     print(f"Run saved: {output}")
@@ -113,7 +123,9 @@ async def solari_run(count: int, seed_start: int, output: Path):
     output.write_text(json.dumps({"run_id": f"solari-{seed_start}-{seed_start + count - 1}",
                                   "started_at": datetime.now().astimezone().isoformat(),
                                   "futures": results,
-                                  "summary": {"explored": len(results), "failures": len(failing_seeds), "patched_replays": len(patched)}}, indent=2) + "\n")
+                                  "summary": {"explored": len(results), "failures": len(failing_seeds),
+                                              "patched_replays": len(patched),
+                                              "virtual_days": round(sum(event_span_days(generate_future(seed)) for seed in range(seed_start, seed_start + count)), 1)}}, indent=2) + "\n")
     print("Solari exploration")
     print(f"Isolated futures: {len(results)} (sandbox + browser per future, run concurrently)")
     print(f"Failures found: {len(failing_seeds)}")
