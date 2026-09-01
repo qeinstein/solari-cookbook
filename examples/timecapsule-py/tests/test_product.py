@@ -32,6 +32,12 @@ class ProductLoopTests(unittest.TestCase):
         self.assertEqual(coverage["possible"], 2)
         self.assertEqual(len(coverage["patterns"]), 2)
 
+    def test_dashboard_surfaces_agent_belief_and_documentation_link(self):
+        html = Path(__file__).parents[1] / "dashboard/index.html"
+        text = html.read_text()
+        self.assertIn('id="agent-state"', text)
+        self.assertIn('class="docs-link"', text)
+
     def test_local_run_persists_patch_outcomes(self):
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / "latest.json"
