@@ -25,6 +25,13 @@ This finds a delayed-payment failure, reduces it to the payment → wakeup →
 webhook sequence, compares the original and patched agent, and writes a trace
 under `runs/`.
 
+The same local CLI is available as a package command from this example
+directory:
+
+```bash
+python3 -m timecapsule run --futures 25
+```
+
 ## Run with Solari
 
 ```bash

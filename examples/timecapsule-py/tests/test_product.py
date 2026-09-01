@@ -8,6 +8,7 @@ from urllib.request import Request, urlopen
 from dashboard.server import make_handler
 from main import future_coverage, local_run
 from timecapsule.core import comparison, generate_future, invariant_holds, minimize, execute
+from timecapsule.execution import execute_future
 from http.server import ThreadingHTTPServer
 
 
@@ -45,6 +46,12 @@ class ProductLoopTests(unittest.TestCase):
             data = json.loads(output.read_text())
             self.assertEqual(data["futures"][0]["comparison"], {"original": "FAIL", "patched": "PASS"})
             self.assertEqual(data["summary"]["patched_replays"], 1)
+
+    def test_structured_execution_record_matches_core_outcome(self):
+        execution = execute_future("future-0", generate_future(0), seed=0)
+        self.assertEqual(execution.status, "FAIL")
+        self.assertEqual(execution.as_dict()["future_id"], "future-0")
+        self.assertEqual(execution.as_dict()["events"][0]["kind"], "invoice_created")
 
 
 class DashboardApiTests(unittest.TestCase):
