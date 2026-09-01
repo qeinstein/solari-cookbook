@@ -125,6 +125,7 @@ class DashboardApiTests(unittest.TestCase):
                 self.assertEqual(len(payload["original_events"]), 6)
                 self.assertEqual(len(payload["minimal_events"]), 3)
                 self.assertEqual(payload["input_hash"], future_fingerprint(events))
+                self.assertEqual(payload["minimal_violation"]["at"], payload["minimal_events"][1]["at"])
                 self.assertEqual(payload["comparison"], {"original": "FAIL", "patched": "PASS"})
             finally:
                 server.shutdown()

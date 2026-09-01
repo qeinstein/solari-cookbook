@@ -8,7 +8,15 @@ import sys
 from urllib.parse import urlparse
 
 sys.path.insert(0, str(Path(__file__).parents[1]))
-from timecapsule.core import comparison, future_fingerprint, minimize, save_future, Event
+from timecapsule.core import (
+    Event,
+    comparison,
+    execute,
+    future_fingerprint,
+    minimize,
+    save_future,
+    violation_snapshot,
+)
 
 
 def entry_events(entry):
@@ -87,6 +95,7 @@ def make_handler(run_path, regression_dir=None):
                         "minimal_events": [event.as_dict() for event in events],
                         "input_hash": future_fingerprint(original_events),
                         "minimal_input_hash": future_fingerprint(events),
+                        "minimal_violation": violation_snapshot(execute(events)),
                         "comparison": result,
                         "saved": str(output),
                     }))
@@ -99,6 +108,7 @@ def make_handler(run_path, regression_dir=None):
                         "events": len(events),
                         "minimal_events": [event.as_dict() for event in events],
                         "minimal_input_hash": future_fingerprint(events),
+                        "minimal_violation": violation_snapshot(execute(events)),
                         "comparison": result,
                         "regression": str(regression_path),
                     }))

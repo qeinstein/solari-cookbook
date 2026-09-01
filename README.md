@@ -16,8 +16,9 @@ past. Copy one into your project and change the parts you care about.
 [TimeCapsule](examples/timecapsule-py) explores long-running agent futures: each
 future gets an isolated Solari sandbox and recorded cloud browser, failures are
 minimized into reproducible event sequences, and the same future is replayed
-against a patched agent. Start with the example README for the local proof or
-the real Solari run.
+against a patched agent. The [TimeCapsule README](examples/timecapsule-py/README.md)
+contains a 90-second demo path, architecture, verified checks, and the real
+Solari command.
 
 ## Examples
 
@@ -56,7 +57,7 @@ the real Solari run.
 Each directory is self-contained.
 
 ```bash
-git clone https://github.com/solari-sdk/solari-cookbook.git
+git clone https://github.com/qeinstein/solari-cookbook.git
 cd solari-cookbook/examples/browser-quickstart-ts
 
 npm install                          # or: pip install -r requirements.txt

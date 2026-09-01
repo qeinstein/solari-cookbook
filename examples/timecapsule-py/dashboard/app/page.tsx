@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ApiError, fetchRun, postFutureAction } from "../lib/api";
-import type { ActionResponse, Future, RunData } from "../lib/types";
+import type { ActionResponse, Future, RunData, TimeEvent } from "../lib/types";
 
 const eventLabels: Record<string, string> = {
   invoice_created: "Invoice created",
@@ -11,18 +11,28 @@ const eventLabels: Record<string, string> = {
   agent_wakeup: "Agent wakeup",
 };
 
-const patternLabels: Record<string, string> = {
-  customer_payment: "payment",
-  agent_wakeup: "wakeup",
-  payment_webhook: "webhook",
+const branchEventLabels: Record<string, string> = {
+  invoice_created: "Invoice",
+  customer_payment: "Paid",
+  payment_webhook: "Webhook",
+  agent_wakeup: "Wake",
 };
 
 function eventLabel(kind: string) {
   return eventLabels[kind] ?? kind.replaceAll("_", " ");
 }
 
-function formatDate(value: string) {
-  return new Date(value).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+function formatMoment(value: string) {
+  return new Date(value).toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function shortHash(value?: string) {
+  return value ? value.slice(0, 12) : "not recorded";
 }
 
 function ActionButton({
@@ -54,27 +64,26 @@ function FutureRow({
   index: number;
   onSelect: (future: Future) => void;
 }) {
-  const events = future.events;
-
   return (
     <button
       className={`future-row ${future.status.toLowerCase()} ${selected ? "selected" : ""}`}
       type="button"
       aria-pressed={selected}
-      style={{ animationDelay: `${Math.min(index, 10) * 40}ms` }}
+      style={{ animationDelay: `${Math.min(index, 10) * 35}ms` }}
       onClick={() => onSelect(future)}
     >
+      <span className="branch-line" aria-hidden="true" />
       <span className="future-id">
         <strong>{future.future_id}</strong>
         <small>seed {future.seed}</small>
       </span>
       <span className="events" aria-label={`Events in ${future.future_id}`}>
-        {events.map((event, index) => (
-          <span className="event-group" key={`${event.at}-${event.kind}`}>
-            {index > 0 ? <span className="arrow" aria-hidden="true">→</span> : null}
+        {future.events.map((event, eventIndex) => (
+          <span className="event-group" key={`${event.at}-${event.kind}-${eventIndex}`}>
+            {eventIndex > 0 ? <span className="arrow" aria-hidden="true">→</span> : null}
             <span className="event">
               <span className="event-dot" aria-hidden="true" />
-              {eventLabel(event.kind)}
+              {branchEventLabels[event.kind] ?? eventLabel(event.kind)}
             </span>
           </span>
         ))}
@@ -89,7 +98,12 @@ export default function Dashboard() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [actionMessage, setActionMessage] = useState("");
+  const [actionResult, setActionResult] = useState<{
+    futureId: string;
+    action: "compare" | "minimize" | "regress";
+    payload: ActionResponse;
+  } | null>(null);
+  const [actionError, setActionError] = useState("");
   const [workingAction, setWorkingAction] = useState<string | null>(null);
 
   const loadRun = useCallback(async () => {
@@ -100,7 +114,9 @@ export default function Dashboard() {
       setData(nextData);
       setSelectedId((current) => {
         if (current && nextData.futures.some((future) => future.future_id === current)) return current;
-        return nextData.futures.find((future) => future.status === "FAIL")?.future_id ?? nextData.futures[0]?.future_id ?? null;
+        return nextData.futures.find((future) => future.status === "FAIL")?.future_id
+          ?? nextData.futures[0]?.future_id
+          ?? null;
       });
     } catch (caught) {
       setError(caught instanceof ApiError ? caught.message : "The saved trace could not be loaded.");
@@ -117,20 +133,39 @@ export default function Dashboard() {
 
   const futures = useMemo(() => data?.futures ?? [], [data]);
   const failures = useMemo(() => futures.filter((future) => future.status === "FAIL"), [futures]);
-  const selected = futures.find((future) => future.future_id === selectedId) ?? failures[0];
+  const selected = futures.find((future) => future.future_id === selectedId) ?? futures[0];
+  const selectedAction = actionResult?.futureId === selected?.future_id ? actionResult : null;
+  const displayEvents = selectedAction?.action === "minimize" && selectedAction.payload.minimal_events
+    ? selectedAction.payload.minimal_events
+    : selected?.events ?? [];
   const coverage = data?.summary?.coverage;
   const patchedPasses = failures.filter((future) => future.comparison?.patched === "PASS").length;
   const patchedKnown = failures.length > 0 && failures.every((future) => future.comparison?.patched);
+  const violation = selectedAction?.action === "minimize"
+    ? selectedAction.payload.minimal_violation
+    : selected?.violation;
+  const isSolari = data?.execution_mode === "solari";
+  const cloudSameInput = Boolean(
+    selected?.input_hash
+      && selected.patched_run?.input_hash
+      && selected.input_hash === selected.patched_run.input_hash,
+  );
+
+  function selectFuture(future: Future) {
+    setSelectedId(future.future_id);
+    setActionResult(null);
+    setActionError("");
+  }
 
   async function runAction(action: "compare" | "minimize" | "regress") {
     if (!selected) return;
     setWorkingAction(action);
-    setActionMessage("Working…");
+    setActionError("");
     try {
-      const result = await postFutureAction(selected.future_id, action);
-      setActionMessage(actionMessageFor(action, result));
+      const payload = await postFutureAction(selected.future_id, action);
+      setActionResult({ futureId: selected.future_id, action, payload });
     } catch (caught) {
-      setActionMessage(caught instanceof ApiError ? caught.message : "Action unavailable.");
+      setActionError(caught instanceof ApiError ? caught.message : "Action unavailable.");
     } finally {
       setWorkingAction(null);
     }
@@ -146,13 +181,13 @@ export default function Dashboard() {
         <div className="overline">Workspace</div>
         <nav className="nav">
           <a className="active" href="#future-tree"><span className="nav-icon">◌</span>Future tree</a>
-          <a href="#regressions"><span className="nav-icon">⌁</span>Regressions</a>
+          <a href="#evidence"><span className="nav-icon">⌁</span>Evidence</a>
           <a href="#coverage"><span className="nav-icon">◇</span>Coverage</a>
         </nav>
         <div className="side-bottom">
-          <div className="overline">Environment</div>
-          <p>Collections / local</p>
-          <p>Event-driven clock</p>
+          <div className="overline">Execution</div>
+          <p>{isSolari ? "Solari cloud isolation" : "Deterministic local proof"}</p>
+          <p>{isSolari ? "Sandbox + browser / future" : "Event-driven clock"}</p>
         </div>
       </aside>
 
@@ -160,6 +195,9 @@ export default function Dashboard() {
         <div className="topbar">
           <div className="crumbs"><span>Projects</span><span aria-hidden="true">›</span><b>Collections agent</b></div>
           <div className="top-actions">
+            <span className={`mode-badge ${isSolari ? "cloud" : ""}`}>
+              <span aria-hidden="true" />{isSolari ? "Solari run" : "Local proof"}
+            </span>
             <a className="docs-link" href="https://github.com/qeinstein/solari-cookbook/tree/main/examples/timecapsule-py" target="_blank" rel="noreferrer">Documentation</a>
             <div className="avatar" aria-label="Workspace owner">Q</div>
           </div>
@@ -168,37 +206,17 @@ export default function Dashboard() {
         <section className="intro">
           <div>
             <div className="kicker">Temporal reliability workspace</div>
-            <h1>Find the future<br />before it happens.</h1>
-            <p>Explore the event sequences that make an autonomous collections agent unsafe, then replay the same future against a fix.</p>
+            <h1>Find the future before it happens.</h1>
+            <p>Branch a real agent workflow across time, isolate the unsafe future, and replay that exact input against the fix.</p>
           </div>
           <div className="run-info">Latest exploration<strong>{loading ? "Loading saved run…" : data?.run_id ?? "No saved run"}</strong></div>
-        </section>
-
-        <section className="metrics" aria-label="Run metrics">
-          <Metric label="Futures explored" value={loading ? "—" : futures.length.toLocaleString()} note="isolated timelines" />
-          <Metric label="Event-time advanced" value={loading ? "—" : (data?.summary?.virtual_days ?? 0).toLocaleString(undefined, { maximumFractionDigits: 1 })} note="measured across futures" />
-          <Metric label="Failures found" value={loading ? "—" : failures.length.toLocaleString()} note="invariant violations" tone="fail" />
-          <Metric label="Patched replay" value={loading ? "—" : patchedKnown ? `${patchedPasses}/${failures.length}` : "—"} note="same future, new agent" tone="pass" />
-        </section>
-
-        <section className="coverage-panel" id="coverage" aria-labelledby="coverage-title">
-          <div>
-            <div className="coverage-label">Temporal coverage</div>
-            <h2 id="coverage-title">{coverage?.covered ?? 0} / {coverage?.possible ?? 0} orderings</h2>
-            <p>Distinct event orders observed in this exploration.</p>
-          </div>
-          <div className="patterns">
-            {(coverage?.patterns ?? []).map((pattern) => (
-              <span className="pattern" key={pattern.join("-")}>{pattern.map((kind) => patternLabels[kind] ?? kind).join(" → ")}</span>
-            ))}
-          </div>
         </section>
 
         <div className="workspace" id="future-tree">
           <section aria-labelledby="future-tree-title">
             <div className="section-head">
-              <div><h2 id="future-tree-title">Future tree</h2><p>Each row is a branch from the same starting world.</p></div>
-              <div className="section-meta">{loading ? "Loading trace" : error ? "Trace unavailable" : `${failures.length} failure${failures.length === 1 ? "" : "s"} found`}</div>
+              <div><h2 id="future-tree-title">Future tree</h2><p>Deterministic branches from one shared invoice state.</p></div>
+              <div className="section-meta">{loading ? "Loading trace" : error ? "Trace unavailable" : `${failures.length} unsafe / ${futures.length} explored`}</div>
             </div>
             {error ? (
               <div className="empty error-state" role="alert">
@@ -211,43 +229,141 @@ export default function Dashboard() {
             ) : futures.length === 0 ? (
               <div className="empty"><strong>No saved run yet.</strong><span>Run <code>python3 main.py run --futures 25</code> first.</span></div>
             ) : (
-              <div className="tree">
-                {futures.map((future, index) => <FutureRow key={future.future_id} future={future} index={index} selected={selected?.future_id === future.future_id} onSelect={(next) => setSelectedId(next.status === "FAIL" ? next.future_id : selectedId)} />)}
-              </div>
+              <>
+                <div className="branch-root"><span className="root-node" aria-hidden="true" />Shared world <b>INV-1842</b></div>
+                <div className="tree">
+                  {futures.map((future, index) => (
+                    <FutureRow
+                      key={future.future_id}
+                      future={future}
+                      index={index}
+                      selected={selected?.future_id === future.future_id}
+                      onSelect={selectFuture}
+                    />
+                  ))}
+                </div>
+              </>
             )}
           </section>
 
           <aside className={`inspector ${selected?.status === "PASS" ? "pass-inspector" : ""}`} aria-labelledby="inspector-title">
-            <div className="inspector-kicker"><span>{selected?.status === "FAIL" ? "Selected failure" : "Selected future"}</span><span>{selected?.future_id ?? "—"}</span></div>
-            <h3 id="inspector-title">{selected?.status === "FAIL" ? "Stale payment contact" : "Waiting for a failure"}</h3>
-            <p className="inspector-sub">{selected?.status === "FAIL" ? "The agent contacted a customer after payment, before the CRM received its webhook." : "Run an exploration to inspect the causal sequence."}</p>
+            <div className="inspector-kicker"><span>{selected?.status === "FAIL" ? "Invariant violated" : "Invariant held"}</span><span>{selected?.future_id ?? "—"}</span></div>
+            <h3 id="inspector-title">{selected?.status === "FAIL" ? "Contact inside the stale window" : "No unsafe contact observed"}</h3>
+            <p className="inspector-sub">
+              {selected?.status === "FAIL"
+                ? "Payment was already settled while the CRM and agent still believed the invoice was overdue."
+                : "Every agent wakeup stayed outside the paid-but-stale interval for this branch."}
+            </p>
+
             <div className="state-grid">
-              <State label="Payment system" value={selected?.status === "FAIL" ? "PAID" : "—"} />
-              <State label="CRM state" value={selected?.status === "FAIL" ? "OVERDUE" : "—"} bad={selected?.status === "FAIL"} />
-              <State label="Agent belief" value={selected?.status === "FAIL" ? "OVERDUE" : "—"} bad={selected?.status === "FAIL"} />
+              <State label="Payment system" value={violation?.payment_status ?? selected?.payment_status?.toUpperCase() ?? selected?.observed?.payment?.toUpperCase() ?? "—"} />
+              <State label="CRM state" value={violation?.crm_status ?? selected?.invoice_status?.toUpperCase() ?? selected?.observed?.crm?.toUpperCase() ?? "—"} bad={Boolean(violation)} />
+              <State label={violation ? "Agent belief" : "Unsafe contact"} value={violation?.agent_belief ?? "NONE"} bad={Boolean(violation)} />
             </div>
-            <div className="timeline-title">Minimal failing future</div>
-            <div className="mini-timeline">
-              {(selected?.events ?? []).filter((event) => event.kind !== "invoice_created").map((event, index, events) => (
-                <div className="step" key={`${event.at}-${event.kind}`}>
-                  <span className="step-dot" aria-hidden="true" />
-                  <div>{eventLabel(event.kind)}<small>{formatDate(event.at)}</small></div>
-                  {index < events.length - 1 ? <span className="step-line" aria-hidden="true" /> : null}
-                </div>
-              ))}
-              {!selected ? <div className="timeline-empty">No event sequence selected.</div> : null}
+
+            <div className="inspector-actions">
+              <ActionButton disabled={!selected || workingAction !== null} onClick={() => void runAction("compare")}>Replay exact input</ActionButton>
+              <ActionButton variant="secondary" disabled={!selected || selected.status !== "FAIL" || workingAction !== null} onClick={() => void runAction("minimize")}>Minimize</ActionButton>
+              <ActionButton variant="secondary" disabled={!selected || selected.status !== "FAIL" || workingAction !== null} onClick={() => void runAction("regress")}>Save regression</ActionButton>
+              <span className="action-output" role="status" aria-live="polite">
+                {workingAction ? "Running evidence step…" : actionError || actionSummary(selectedAction)}
+              </span>
             </div>
-            <div className="inspector-actions" id="regressions">
-              <ActionButton disabled={!selected || workingAction !== null} onClick={() => void runAction("compare")}>Replay comparison</ActionButton>
-              <ActionButton variant="secondary" disabled={!selected || workingAction !== null} onClick={() => void runAction("minimize")}>Minimize future</ActionButton>
-              <ActionButton variant="secondary" disabled={!selected || workingAction !== null} onClick={() => void runAction("regress")}>Save regression</ActionButton>
-              <span className="action-output" role="status" aria-live="polite">{actionMessage}</span>
+
+            <div className="timeline-heading">
+              <span>{selectedAction?.action === "minimize" ? "Minimized counterexample" : "Candidate future"}</span>
+              <b>{displayEvents.length} events</b>
             </div>
+            <Timeline events={displayEvents} violationAt={violation?.at} />
+
+            {selected?.status === "FAIL" ? (
+              <div className="proof-flow" id="evidence" aria-label="Failure repair proof">
+                <ProofStep label="Original" value="FAIL" tone="fail" />
+                <span aria-hidden="true">→</span>
+                <ProofStep
+                  label="Minimize"
+                  value={selectedAction?.action === "minimize"
+                    ? `${selectedAction.payload.before_events}→${selectedAction.payload.events}`
+                    : "ready"}
+                />
+                <span aria-hidden="true">→</span>
+                <ProofStep label="Patched" value={selected.comparison?.patched ?? "—"} tone="pass" />
+              </div>
+            ) : null}
+
+            <Evidence selected={selected} selectedAction={selectedAction} cloudSameInput={cloudSameInput} />
           </aside>
         </div>
+
+        <section className="run-summary" aria-label="Run summary">
+          <div className="metrics">
+            <Metric label="Futures explored" value={loading ? "—" : futures.length.toLocaleString()} note="deterministic timelines" />
+            <Metric label="Event-time" value={loading ? "—" : `${(data?.summary?.virtual_days ?? 0).toLocaleString(undefined, { maximumFractionDigits: 1 })}d`} note="summed branch spans" />
+            <Metric label="Failures" value={loading ? "—" : failures.length.toLocaleString()} note="observed violations" tone="fail" />
+            <Metric label="Patched replay" value={loading ? "—" : patchedKnown ? `${patchedPasses}/${failures.length}` : "—"} note="same generated input" tone="pass" />
+          </div>
+
+          <div className="coverage-panel" id="coverage">
+            <div>
+              <div className="coverage-label">Temporal coverage</div>
+              <h2>{coverage?.covered ?? 0} / {coverage?.possible ?? 0} windows</h2>
+              <p>Meaningful wakeup positions exercised by this run.</p>
+            </div>
+            <div className="patterns">
+              {(coverage?.patterns ?? []).map((pattern) => (
+                <span className="pattern" key={pattern.id}><b>{pattern.futures}</b>{pattern.label}</span>
+              ))}
+            </div>
+          </div>
+        </section>
       </div>
     </main>
   );
+}
+
+function Timeline({ events, violationAt }: { events: TimeEvent[]; violationAt?: string }) {
+  const visibleEvents = events.filter((event) => event.kind !== "invoice_created");
+  return (
+    <div className="mini-timeline">
+      {visibleEvents.map((event, index) => {
+        const violating = event.kind === "agent_wakeup" && event.at === violationAt;
+        return (
+          <div className={`step ${violating ? "violating" : ""}`} key={`${event.at}-${event.kind}-${index}`}>
+            <span className="step-dot" aria-hidden="true" />
+            <div>{eventLabel(event.kind)}{violating ? <em>violation</em> : null}<small>{formatMoment(event.at)}</small></div>
+            {index < visibleEvents.length - 1 ? <span className="step-line" aria-hidden="true" /> : null}
+          </div>
+        );
+      })}
+      {visibleEvents.length === 0 ? <div className="timeline-empty">No event sequence selected.</div> : null}
+    </div>
+  );
+}
+
+function Evidence({
+  selected,
+  selectedAction,
+  cloudSameInput,
+}: {
+  selected?: Future;
+  selectedAction: { action: string; payload: ActionResponse } | null;
+  cloudSameInput: boolean;
+}) {
+  const actionHash = selectedAction?.payload.input_hash;
+  const sameInput = selectedAction?.payload.same_input || cloudSameInput;
+  const recording = selected?.recording_status ?? selected?.patched_run?.recording_status;
+  return (
+    <div className="evidence-card">
+      <div><span>Input fingerprint</span><code>{shortHash(actionHash ?? selected?.input_hash)}</code></div>
+      <div><span>Counterfactual</span><strong className={sameInput ? "verified" : ""}>{sameInput ? "Same input verified" : selected?.comparison ? "Same generated seed" : "Not replayed"}</strong></div>
+      {selected?.sandbox_id ? <div><span>Solari isolation</span><code>{selected.sandbox_id.slice(0, 12)}</code></div> : null}
+      {recording ? <div><span>Session evidence</span><strong>{recording.replaceAll("_", " ")}</strong></div> : null}
+    </div>
+  );
+}
+
+function ProofStep({ label, value, tone }: { label: string; value: string; tone?: "fail" | "pass" }) {
+  return <div><span>{label}</span><strong className={tone ?? ""}>{value}</strong></div>;
 }
 
 function Metric({ label, value, note, tone }: { label: string; value: string; note: string; tone?: "fail" | "pass" }) {
@@ -258,8 +374,9 @@ function State({ label, value, bad = false }: { label: string; value: string; ba
   return <div className="state"><span className="state-label">{label}</span><strong className={bad ? "bad" : ""}>{value}</strong></div>;
 }
 
-function actionMessageFor(action: "compare" | "minimize" | "regress", result: ActionResponse) {
-  if (action === "regress") return `Regression saved · ${result.events ?? "—"} events`;
-  if (action === "minimize") return `${result.events ?? "—"} events · patched ${result.comparison?.patched ?? "—"} · saved`;
-  return `Original ${result.comparison?.original ?? "—"} · Patched ${result.comparison?.patched ?? "—"}`;
+function actionSummary(result: { action: string; payload: ActionResponse } | null) {
+  if (!result) return "";
+  if (result.action === "regress") return `Regression saved · ${result.payload.events ?? "—"} events`;
+  if (result.action === "minimize") return `${result.payload.removed_events ?? 0} events removed · patched ${result.payload.comparison?.patched ?? "—"}`;
+  return `Original ${result.payload.comparison?.original ?? "—"} · patched ${result.payload.comparison?.patched ?? "—"}`;
 }
