@@ -35,7 +35,10 @@ python3 main.py solari --futures 3
 
 Each future creates and destroys its own sandbox and browser session. The
 browser session is created with recording enabled; the output includes the
-session IDs and preview URLs needed to inspect a run.
+session IDs and preview URLs needed to inspect a run. Failing futures are then
+replayed in fresh isolated pairs with the fixed agent, and the complete result
+is written to `runs/solari-latest.json` (use a higher `--futures` value only
+within your account's concurrency limit).
 
 ## Dashboard
 

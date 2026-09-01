@@ -90,23 +90,37 @@ async def solari_future(seed: int, fixed: bool = False):
                     payment = await page.locator("#payment").inner_text()
                     crm = await page.locator("#crm").inner_text()
                     failed = payment == "PAID" and crm == "OVERDUE" and messages != "No messages sent."
-                    return {"future_id": f"future-{seed}", "seed": seed, "status": "FAIL" if failed and not fixed else "PASS",
+                    return {"future_id": f"future-{seed}", "seed": seed, "status": "FAIL" if failed else "PASS",
                             "agent": "fixed" if fixed else "original", "sandbox_id": sandbox.sandboxId,
                             "browser_session_id": browser.id, "preview_url": preview_url,
+                            "events": [event.as_dict() for event in generate_future(seed)],
                             "observed": {"payment": payment, "crm": crm, "messages": messages}}
         finally:
             await sandbox.kill()
 
 
-async def solari_run(count: int, seed_start: int):
+async def solari_run(count: int, seed_start: int, output: Path):
     if not os.environ.get("SOLARI_API_KEY"):
         raise SystemExit("SOLARI_API_KEY is required for Solari mode")
     results = await asyncio.gather(*(solari_future(seed) for seed in range(seed_start, seed_start + count)))
+    failing_seeds = [result["seed"] for result in results if result["status"] == "FAIL"]
+    patched = await asyncio.gather(*(solari_future(seed, fixed=True) for seed in failing_seeds))
+    patched_by_seed = {result["seed"]: result for result in patched}
+    for result in results:
+        candidate = patched_by_seed.get(result["seed"])
+        result["comparison"] = {"original": result["status"], "patched": candidate["status"] if candidate else "NOT_RUN"}
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(json.dumps({"run_id": f"solari-{seed_start}-{seed_start + count - 1}",
+                                  "started_at": datetime.now().astimezone().isoformat(),
+                                  "futures": results,
+                                  "summary": {"explored": len(results), "failures": len(failing_seeds), "patched_replays": len(patched)}}, indent=2) + "\n")
     print("Solari exploration")
     print(f"Isolated futures: {len(results)} (sandbox + browser per future, run concurrently)")
-    print(f"Failures found: {sum(result['status'] == 'FAIL' for result in results)}")
+    print(f"Failures found: {len(failing_seeds)}")
+    print(f"Patched replays: {len(patched)}")
+    print(f"Run saved: {output}")
     for result in results:
-        print(f"{result['future_id']}: {result['status']} · sandbox {result['sandbox_id']} · browser {result['browser_session_id']}")
+        print(f"{result['future_id']}: original={result['comparison']['original']} patched={result['comparison']['patched']} · sandbox {result['sandbox_id']} · browser {result['browser_session_id']}")
 
 
 def main():
@@ -119,11 +133,12 @@ def main():
     cloud = sub.add_parser("solari", help="run isolated futures in Solari")
     cloud.add_argument("--futures", type=int, default=2)
     cloud.add_argument("--seed", type=int, default=0)
+    cloud.add_argument("--output", type=Path, default=Path("runs/solari-latest.json"))
     args = parser.parse_args()
     if args.mode == "local":
         local_run(args.futures, args.seed, args.output)
     else:
-        asyncio.run(solari_run(args.futures, args.seed))
+        asyncio.run(solari_run(args.futures, args.seed, args.output))
 
 
 if __name__ == "__main__":

@@ -7,6 +7,14 @@ Every example in this repo is a complete program you can run in under a minute.
 They are deliberately small: one idea each, no framework, no scaffolding to read
 past. Copy one into your project and change the parts you care about.
 
+## Featured example: TimeCapsule
+
+[TimeCapsule](examples/timecapsule-py) explores long-running agent futures: each
+future gets an isolated Solari sandbox and recorded cloud browser, failures are
+minimized into reproducible event sequences, and the same future is replayed
+against a patched agent. Start with the example README for the local proof or
+the real Solari run.
+
 ## Examples
 
 ### TimeCapsule
