@@ -14,7 +14,9 @@ def entry_events(entry):
     return [Event(datetime.fromisoformat(item["at"]), item["kind"], item.get("payload", {})) for item in entry["events"]]
 
 
-def make_handler(run_path):
+def make_handler(run_path, regression_dir=None):
+    regression_dir = regression_dir or Path(__file__).parents[1] / "regressions"
+
     class Handler(BaseHTTPRequestHandler):
         def body(self, value, status=200, content_type="application/json"):
             raw = value if isinstance(value, bytes) else value.encode()
@@ -28,7 +30,7 @@ def make_handler(run_path):
 
         def do_POST(self):
             parts = urlparse(self.path).path.strip("/").split("/")
-            if len(parts) != 4 or parts[:2] != ["api", "futures"] or parts[3] not in {"compare", "minimize"}:
+            if len(parts) != 4 or parts[:2] != ["api", "futures"] or parts[3] not in {"compare", "minimize", "regress"}:
                 self.body(b'{"error":"not found"}', 404); return
             data = json.loads(run_path.read_text()) if run_path.exists() else {"futures": []}
             entry = next((item for item in data["futures"] if item["future_id"] == parts[2]), None)
@@ -37,6 +39,10 @@ def make_handler(run_path):
             if parts[3] == "minimize":
                 events = minimize(events); output = run_path.parent / f"{parts[2]}-minimal.json"; result = comparison(events); save_future(output, events, result)
                 self.body(json.dumps({"events": len(events), "comparison": result, "saved": str(output)}))
+            elif parts[3] == "regress":
+                regression_path = regression_dir / f"{parts[2]}.json"
+                result = comparison(events); save_future(regression_path, events, result)
+                self.body(json.dumps({"events": len(events), "comparison": result, "regression": str(regression_path)}))
             else: self.body(json.dumps({"comparison": comparison(events)}))
 
         def log_message(self, *_): pass

@@ -51,7 +51,9 @@ python3 dashboard/server.py --run runs/latest.json
 ```
 
 Open `http://127.0.0.1:8766` to inspect the future tree, failure invariant,
-event sequence, replay comparison, and minimization result.
+event sequence, replay comparison, and minimization result. Select a failure
+and use **Save regression** to promote its reproducible event sequence into
+`regressions/<future-id>.json`.
 
 The same workflow is available from the command line:
 
