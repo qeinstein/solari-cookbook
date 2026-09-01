@@ -38,20 +38,26 @@ class Handler(BaseHTTPRequestHandler):
         elif path == "/pay":
             STATE["payment"] = "paid"
             STATE["webhook_scheduled"] = True
-            STATE["trace"].append({"action": "pay"})
+            STATE["trace"].append({"action": "pay", "payment": STATE["payment"], "crm": STATE["crm"]})
         elif path == "/webhook":
             STATE["crm"] = "paid"
-            STATE["trace"].append({"action": "webhook"})
+            STATE["trace"].append({"action": "webhook", "payment": STATE["payment"], "crm": STATE["crm"]})
         elif path == "/agent/original":
             sent = STATE["crm"] == "overdue"
             if sent:
                 STATE["messages"].append("Your payment remains overdue.")
-            STATE["trace"].append({"action": "agent/original", "sent": sent})
+            STATE["trace"].append({
+                "action": "agent/original", "sent": sent,
+                "payment": STATE["payment"], "crm": STATE["crm"],
+            })
         elif path == "/agent/fixed":
             sent = STATE["crm"] == "overdue" and STATE["payment"] != "paid"
             if sent:
                 STATE["messages"].append("Your payment remains overdue.")
-            STATE["trace"].append({"action": "agent/fixed", "sent": sent})
+            STATE["trace"].append({
+                "action": "agent/fixed", "sent": sent,
+                "payment": STATE["payment"], "crm": STATE["crm"],
+            })
         else:
             self.send_body(b"not found", 404, "text/plain")
             return

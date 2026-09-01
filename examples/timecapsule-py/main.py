@@ -8,12 +8,27 @@ import os
 from pathlib import Path
 import sys
 
-from timecapsule.core import comparison, execute, generate_future, invariant_holds, load_future, minimize, save_future
+from timecapsule.core import (
+    INVARIANT_ID,
+    comparison,
+    execute,
+    future_fingerprint,
+    generate_future,
+    invariant_holds,
+    load_future,
+    minimize,
+    observed_invariant_holds,
+    observed_violation,
+    save_future,
+    temporal_windows,
+    violation_snapshot,
+)
 
 ROOT = Path(__file__).parent
-EVENT_ORDER_PATTERNS = {
-    ("customer_payment", "agent_wakeup", "payment_webhook"),
-    ("customer_payment", "payment_webhook", "agent_wakeup"),
+TEMPORAL_WINDOWS = {
+    "before_payment": "Wakeup before payment",
+    "stale_window": "Wakeup in stale CRM window",
+    "after_webhook": "Wakeup after webhook",
 }
 
 
@@ -25,12 +40,17 @@ def event_span_days(events):
 
 
 def future_coverage(event_sequences):
-    """Summarize the event-ordering patterns observed in an exploration."""
-    patterns = sorted({
-        tuple(event.kind for event in events if event.kind != "invoice_created")
-        for events in event_sequences
-    })
-    return {"covered": len(patterns), "possible": len(EVENT_ORDER_PATTERNS), "patterns": patterns}
+    """Summarize which meaningful temporal windows the exploration exercised."""
+    counts = {window: 0 for window in TEMPORAL_WINDOWS}
+    for events in event_sequences:
+        for window in temporal_windows(events):
+            counts[window] += 1
+    covered = [
+        {"id": window, "label": label, "futures": counts[window]}
+        for window, label in TEMPORAL_WINDOWS.items()
+        if counts[window]
+    ]
+    return {"covered": len(covered), "possible": len(TEMPORAL_WINDOWS), "patterns": covered}
 
 
 async def goto_preview(page, preview_url: str):
@@ -74,30 +94,34 @@ def serializable_world(world):
 def local_run(count: int, seed_start: int, output: Path):
     futures = []
     failures = []
+    event_sequences = []
     virtual_days = 0
     for seed in range(seed_start, seed_start + count):
         events = generate_future(seed)
+        event_sequences.append(events)
         virtual_days += event_span_days(events)
         world = execute(events)
         status = "PASS" if invariant_holds(world) else "FAIL"
+        replay = comparison(events)
         entry = {"future_id": f"future-{seed}", "seed": seed, "agent": "original",
                  "status": status,
-                 "invariant": "no_contact_during_stale_payment_window",
-                 "comparison": {"original": status,
-                                "patched": "PASS" if invariant_holds(execute(events, fixed=True)) else "FAIL"},
+                 "invariant": INVARIANT_ID,
+                 "input_hash": future_fingerprint(events),
+                 "violation": violation_snapshot(world),
+                 "comparison": replay,
                  "events": [event.as_dict() for event in events], **serializable_world(world)}
         futures.append(entry)
         if entry["status"] == "FAIL":
             failures.append((seed, events))
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps({"run_id": f"local-{seed_start}-{seed_start + count - 1}",
+                                  "execution_mode": "local",
                                   "started_at": datetime.now().astimezone().isoformat(),
                                   "futures": futures,
                                   "summary": {"explored": count, "failures": len(failures),
                                               "patched_replays": len(failures),
                                               "virtual_days": round(virtual_days, 1),
-                                              "coverage": future_coverage(
-                                                  [generate_future(seed) for seed in range(seed_start, seed_start + count)])}}, indent=2) + "\n")
+                                              "coverage": future_coverage(event_sequences)}}, indent=2) + "\n")
     print(f"Futures explored: {count}")
     print(f"Failures found: {len(failures)}")
     print(f"Run saved: {output}")
@@ -139,8 +163,9 @@ async def solari_future(seed: int, fixed: bool = False, recording_dir: Path | No
                     browser_session_id = browser.id
                     page = await browser.new_page()
                     await goto_preview(page, preview_url)
+                    events = generate_future(seed)
                     await click_world_action(page, 'button[data-action="reset"]', "reset")
-                    for event in generate_future(seed):
+                    for event in events:
                         if event.kind == "customer_payment":
                             await click_world_action(page, 'button[data-action="pay"]', "pay")
                         elif event.kind == "agent_wakeup":
@@ -152,14 +177,13 @@ async def solari_future(seed: int, fixed: bool = False, recording_dir: Path | No
                     payment = await page.locator("#payment").inner_text()
                     crm = await page.locator("#crm").inner_text()
                     trace = await read_world_trace(page)
-                    webhook_index = next((index for index, item in enumerate(trace) if item["action"] == "webhook"), None)
-                    agent_index = next((index for index, item in enumerate(trace) if item["action"] == f"agent/{'fixed' if fixed else 'original'}" and item.get("sent")), None)
-                    failed = (not fixed and payment == "PAID" and messages != "No messages sent."
-                              and agent_index is not None and webhook_index is not None and agent_index < webhook_index)
+                    failed = not observed_invariant_holds(trace)
                     result = {"future_id": f"future-{seed}", "seed": seed, "status": "FAIL" if failed else "PASS",
                               "agent": "fixed" if fixed else "original", "sandbox_id": sandbox.sandboxId,
                               "browser_session_id": browser_session_id, "preview_url": preview_url,
-                              "events": [event.as_dict() for event in generate_future(seed)],
+                              "input_hash": future_fingerprint(events),
+                              "violation": observed_violation(trace),
+                              "events": [event.as_dict() for event in events],
                               "observed": {"payment": payment, "crm": crm, "messages": messages, "trace": trace}}
                     # rrweb batches recording events; let the final batch flush before release.
                     await asyncio.sleep(2)
@@ -203,9 +227,22 @@ async def solari_run(count: int, seed_start: int, output: Path, concurrency: int
     patched_by_seed = {result["seed"]: result for result in patched}
     for result in results:
         candidate = patched_by_seed.get(result["seed"])
+        if candidate and candidate["input_hash"] != result["input_hash"]:
+            raise RuntimeError(f"counterfactual input mismatch for {result['future_id']}")
         result["comparison"] = {"original": result["status"], "patched": candidate["status"] if candidate else "NOT_RUN"}
+        if candidate:
+            result["patched_run"] = {
+                key: candidate[key]
+                for key in (
+                    "agent", "status", "input_hash", "sandbox_id", "browser_session_id",
+                    "recording_path", "recording_bytes", "recording_events", "recording_status",
+                    "observed",
+                )
+                if key in candidate
+            }
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps({"run_id": f"solari-{seed_start}-{seed_start + count - 1}",
+                                  "execution_mode": "solari",
                                   "started_at": datetime.now().astimezone().isoformat(),
                                   "futures": results,
                                   "summary": {"explored": len(results), "failures": len(failing_seeds),

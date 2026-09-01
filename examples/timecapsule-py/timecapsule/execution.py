@@ -8,7 +8,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from .core import Event, execute as execute_world, invariant_holds
+from .core import Event, INVARIANT_ID, execute as execute_world, invariant_holds
 
 
 @dataclass
@@ -54,7 +54,7 @@ def execute_future(
         agent="fixed" if fixed else "original",
         events=events,
         status="PASS" if invariant_holds(world) else "FAIL",
-        invariant="no_contact_during_stale_payment_window",
+        invariant=INVARIANT_ID,
         messages=world.messages,
         trace=world.trace,
     )

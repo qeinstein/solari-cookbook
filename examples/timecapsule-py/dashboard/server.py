@@ -8,7 +8,7 @@ import sys
 from urllib.parse import urlparse
 
 sys.path.insert(0, str(Path(__file__).parents[1]))
-from timecapsule.core import comparison, minimize, save_future, Event
+from timecapsule.core import comparison, future_fingerprint, minimize, save_future, Event
 
 
 def entry_events(entry):
@@ -74,19 +74,41 @@ def make_handler(run_path, regression_dir=None):
             try:
                 events = entry_events(entry)
                 if parts[3] == "minimize":
-                    events = minimize(events)
+                    original_events = events
+                    events = minimize(original_events)
                     output = run_path.parent / f"{parts[2]}-minimal.json"
                     result = comparison(events)
                     save_future(output, events, result)
-                    self.body(json.dumps({"events": len(events), "comparison": result, "saved": str(output)}))
+                    self.body(json.dumps({
+                        "events": len(events),
+                        "before_events": len(original_events),
+                        "removed_events": len(original_events) - len(events),
+                        "original_events": [event.as_dict() for event in original_events],
+                        "minimal_events": [event.as_dict() for event in events],
+                        "input_hash": future_fingerprint(original_events),
+                        "minimal_input_hash": future_fingerprint(events),
+                        "comparison": result,
+                        "saved": str(output),
+                    }))
                 elif parts[3] == "regress":
                     events = minimize(events)
                     regression_path = regression_dir / f"{parts[2]}.json"
                     result = comparison(events)
                     save_future(regression_path, events, result)
-                    self.body(json.dumps({"events": len(events), "comparison": result, "regression": str(regression_path)}))
+                    self.body(json.dumps({
+                        "events": len(events),
+                        "minimal_events": [event.as_dict() for event in events],
+                        "minimal_input_hash": future_fingerprint(events),
+                        "comparison": result,
+                        "regression": str(regression_path),
+                    }))
                 else:
-                    self.body(json.dumps({"comparison": comparison(events)}))
+                    fingerprint = future_fingerprint(events)
+                    self.body(json.dumps({
+                        "comparison": comparison(events),
+                        "input_hash": fingerprint,
+                        "same_input": True,
+                    }))
             except (KeyError, TypeError, ValueError, OSError, json.JSONDecodeError) as exc:
                 self.error(f"future action failed: {exc}", 422)
 
