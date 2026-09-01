@@ -3,6 +3,7 @@ import argparse
 import json
 from datetime import datetime
 from pathlib import Path
+import re
 import sys
 from urllib.parse import urlparse
 
@@ -14,37 +15,80 @@ def entry_events(entry):
     return [Event(datetime.fromisoformat(item["at"]), item["kind"], item.get("payload", {})) for item in entry["events"]]
 
 
+def read_run(run_path):
+    if not run_path.exists():
+        return {"futures": []}
+    data = json.loads(run_path.read_text())
+    if not isinstance(data, dict) or not isinstance(data.get("futures", []), list):
+        raise ValueError("run file must contain a futures array")
+    return data
+
+
 def make_handler(run_path, regression_dir=None):
     regression_dir = regression_dir or Path(__file__).parents[1] / "regressions"
 
     class Handler(BaseHTTPRequestHandler):
         def body(self, value, status=200, content_type="application/json"):
             raw = value if isinstance(value, bytes) else value.encode()
-            self.send_response(status); self.send_header("Content-Type", content_type); self.send_header("Content-Length", str(len(raw))); self.end_headers(); self.wfile.write(raw)
+            self.send_response(status)
+            self.send_header("Content-Type", f"{content_type}; charset=utf-8")
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.send_header("Content-Length", str(len(raw)))
+            self.end_headers()
+            self.wfile.write(raw)
+
+        def error(self, message, status=400):
+            self.body(json.dumps({"error": message}), status)
 
         def do_GET(self):
             path = urlparse(self.path).path
-            if path == "/api/run": self.body(run_path.read_bytes() if run_path.exists() else b'{"futures":[]}')
-            elif path in {"/", "/index.html"}: self.body((Path(__file__).parent / "index.html").read_bytes(), content_type="text/html")
-            else: self.send_error(404)
+            if path == "/api/run":
+                try:
+                    self.body(json.dumps(read_run(run_path)))
+                except (OSError, ValueError, json.JSONDecodeError) as exc:
+                    self.error(f"run unavailable: {exc}", 503)
+            elif path == "/health":
+                self.body(json.dumps({"status": "ok", "run_exists": run_path.exists()}))
+            else:
+                self.error("not found", 404)
 
         def do_POST(self):
             parts = urlparse(self.path).path.strip("/").split("/")
-            if len(parts) != 4 or parts[:2] != ["api", "futures"] or parts[3] not in {"compare", "minimize", "regress"}:
-                self.body(b'{"error":"not found"}', 404); return
-            data = json.loads(run_path.read_text()) if run_path.exists() else {"futures": []}
+            if (len(parts) != 4 or parts[:2] != ["api", "futures"]
+                    or parts[3] not in {"compare", "minimize", "regress"}):
+                self.error("not found", 404)
+                return
+            if not re.fullmatch(r"[A-Za-z0-9._-]+", parts[2]):
+                self.error("invalid future id", 400)
+                return
+            try:
+                data = read_run(run_path)
+            except (OSError, ValueError, json.JSONDecodeError) as exc:
+                self.error(f"run unavailable: {exc}", 503)
+                return
             entry = next((item for item in data["futures"] if item["future_id"] == parts[2]), None)
-            if entry is None: self.body(b'{"error":"future not found"}', 404); return
-            events = entry_events(entry)
-            if parts[3] == "minimize":
-                events = minimize(events); output = run_path.parent / f"{parts[2]}-minimal.json"; result = comparison(events); save_future(output, events, result)
-                self.body(json.dumps({"events": len(events), "comparison": result, "saved": str(output)}))
-            elif parts[3] == "regress":
-                events = minimize(events)
-                regression_path = regression_dir / f"{parts[2]}.json"
-                result = comparison(events); save_future(regression_path, events, result)
-                self.body(json.dumps({"events": len(events), "comparison": result, "regression": str(regression_path)}))
-            else: self.body(json.dumps({"comparison": comparison(events)}))
+            if entry is None:
+                self.error("future not found", 404)
+                return
+            try:
+                events = entry_events(entry)
+                if parts[3] == "minimize":
+                    events = minimize(events)
+                    output = run_path.parent / f"{parts[2]}-minimal.json"
+                    result = comparison(events)
+                    save_future(output, events, result)
+                    self.body(json.dumps({"events": len(events), "comparison": result, "saved": str(output)}))
+                elif parts[3] == "regress":
+                    events = minimize(events)
+                    regression_path = regression_dir / f"{parts[2]}.json"
+                    result = comparison(events)
+                    save_future(regression_path, events, result)
+                    self.body(json.dumps({"events": len(events), "comparison": result, "regression": str(regression_path)}))
+                else:
+                    self.body(json.dumps({"comparison": comparison(events)}))
+            except (KeyError, TypeError, ValueError, OSError, json.JSONDecodeError) as exc:
+                self.error(f"future action failed: {exc}", 422)
 
         def log_message(self, *_): pass
     return Handler

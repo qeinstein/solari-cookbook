@@ -51,16 +51,36 @@ account's concurrency limit).
 
 ## Dashboard
 
-After a local run:
+The dashboard is a Next.js App Router frontend backed by the small Python API.
+Run both processes after a local run:
 
 ```bash
-python3 dashboard/server.py --run runs/latest.json
+python3 dashboard/server.py --run runs/latest.json --port 8766
+
+cd dashboard
+npm install
+npm run dev
 ```
 
-Open `http://127.0.0.1:8766` to inspect the future tree, failure invariant,
-event sequence, replay comparison, and minimization result. Select a failure
-and use **Save regression** to promote its reproducible event sequence into
-`regressions/<future-id>.json`.
+Open `http://127.0.0.1:3000` to inspect the future tree, failure invariant,
+event sequence, replay comparison, and minimization result. The Next.js app
+proxies `/api/*` to the Python service, so the browser does not need a CORS
+exception. Set `TIMECAPSULE_API_ORIGIN` when the API is not on
+`http://127.0.0.1:8766`; see `dashboard/.env.example`.
+
+For a production build of the frontend:
+
+```bash
+cd dashboard
+npm run lint
+npm run typecheck
+npm run build
+npm run start
+```
+
+The API also exposes `GET /health` for a process-level health check. Select a
+failure and use **Save regression** to promote its reproducible event sequence
+into `regressions/<future-id>.json`.
 
 The same workflow is available from the command line:
 

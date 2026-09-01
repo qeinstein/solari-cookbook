@@ -1,1 +1,4 @@
 runs/
+dashboard/.next/
+dashboard/out/
+dashboard/tsconfig.tsbuildinfo

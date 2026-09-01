@@ -1,5 +1,6 @@
 node_modules/
 package-lock.json
+!examples/timecapsule-py/dashboard/package-lock.json
 .env
 __pycache__/
 *.pyc
