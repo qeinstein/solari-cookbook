@@ -20,6 +20,18 @@ def event_span_days(events):
     return (events[-1].at - events[0].at).total_seconds() / 86400
 
 
+async def goto_preview(page, preview_url: str):
+    """Wait briefly for the sandbox server to bind before driving the UI."""
+    for attempt in range(8):
+        try:
+            await page.goto(preview_url)
+            return
+        except Exception:
+            if attempt == 7:
+                raise
+            await asyncio.sleep(0.5)
+
+
 def serializable_world(world):
     return {
         "payment_status": world.payment_status,
@@ -90,7 +102,7 @@ async def solari_future(seed: int, fixed: bool = False, recording_dir: Path | No
                 async with await solari.launch(recording=True) as browser:
                     browser_session_id = browser.id
                     page = await browser.new_page()
-                    await page.goto(preview_url)
+                    await goto_preview(page, preview_url)
                     await page.locator('button[data-action="reset"]').click()
                     for event in generate_future(seed):
                         if event.kind == "customer_payment":
