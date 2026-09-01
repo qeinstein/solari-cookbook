@@ -62,9 +62,12 @@ def local_run(count: int, seed_start: int, output: Path):
         events = generate_future(seed)
         virtual_days += event_span_days(events)
         world = execute(events)
+        status = "PASS" if invariant_holds(world) else "FAIL"
         entry = {"future_id": f"future-{seed}", "seed": seed, "agent": "original",
-                 "status": "PASS" if invariant_holds(world) else "FAIL",
+                 "status": status,
                  "invariant": "no_contact_during_stale_payment_window",
+                 "comparison": {"original": status,
+                                "patched": "PASS" if invariant_holds(execute(events, fixed=True)) else "FAIL"},
                  "events": [event.as_dict() for event in events], **serializable_world(world)}
         futures.append(entry)
         if entry["status"] == "FAIL":
@@ -74,6 +77,7 @@ def local_run(count: int, seed_start: int, output: Path):
                                   "started_at": datetime.now().astimezone().isoformat(),
                                   "futures": futures,
                                   "summary": {"explored": count, "failures": len(failures),
+                                              "patched_replays": len(failures),
                                               "virtual_days": round(virtual_days, 1),
                                               "coverage": future_coverage(
                                                   [generate_future(seed) for seed in range(seed_start, seed_start + count)])}}, indent=2) + "\n")
@@ -179,6 +183,9 @@ async def solari_run(count: int, seed_start: int, output: Path):
                                   "futures": results,
                                   "summary": {"explored": len(results), "failures": len(failing_seeds),
                                               "patched_replays": len(patched),
+                                              "patched_passes": sum(
+                                                  result["comparison"]["patched"] == "PASS"
+                                                  for result in results if result["status"] == "FAIL"),
                                               "virtual_days": round(sum(event_span_days(generate_future(seed)) for seed in range(seed_start, seed_start + count)), 1),
                                               "coverage": future_coverage(
                                                   [generate_future(seed) for seed in range(seed_start, seed_start + count)])}}, indent=2) + "\n")

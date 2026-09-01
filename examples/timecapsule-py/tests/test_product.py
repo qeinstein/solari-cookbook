@@ -6,7 +6,7 @@ import unittest
 from urllib.request import Request, urlopen
 
 from dashboard.server import make_handler
-from main import future_coverage
+from main import future_coverage, local_run
 from timecapsule.core import comparison, generate_future, invariant_holds, minimize, execute
 from http.server import ThreadingHTTPServer
 
@@ -31,6 +31,14 @@ class ProductLoopTests(unittest.TestCase):
         self.assertEqual(coverage["covered"], 2)
         self.assertEqual(coverage["possible"], 2)
         self.assertEqual(len(coverage["patterns"]), 2)
+
+    def test_local_run_persists_patch_outcomes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "latest.json"
+            local_run(1, 0, output)
+            data = json.loads(output.read_text())
+            self.assertEqual(data["futures"][0]["comparison"], {"original": "FAIL", "patched": "PASS"})
+            self.assertEqual(data["summary"]["patched_replays"], 1)
 
 
 class DashboardApiTests(unittest.TestCase):
