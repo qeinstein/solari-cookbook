@@ -17,7 +17,7 @@ parallel without sharing world state.
 No API key is needed for the deterministic local proof:
 
 ```bash
-python3 main.py local --futures 25
+python3 main.py run --futures 25
 python3 -m unittest discover -s tests -v
 ```
 
@@ -50,6 +50,15 @@ python3 dashboard/server.py --run runs/latest.json
 
 Open `http://127.0.0.1:8766` to inspect the future tree, failure invariant,
 event sequence, replay comparison, and minimization result.
+
+The same workflow is available from the command line:
+
+```bash
+python3 main.py replay regressions/delayed-payment-webhook.json
+python3 main.py minimize regressions/delayed-payment-webhook.json
+python3 main.py compare regressions/delayed-payment-webhook-minimal.json
+python3 main.py regress
+```
 
 ## The failure
 

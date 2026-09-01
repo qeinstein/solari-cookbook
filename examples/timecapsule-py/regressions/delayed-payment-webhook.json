@@ -1,0 +1,8 @@
+{
+  "events": [
+    {"at": "2026-09-05T09:00:00", "kind": "customer_payment", "payload": {"webhook_delay_hours": 36}},
+    {"at": "2026-09-05T09:00:00", "kind": "agent_wakeup", "payload": {}},
+    {"at": "2026-09-06T21:00:00", "kind": "payment_webhook", "payload": {}}
+  ],
+  "result": {"original": "FAIL", "patched": "PASS"}
+}

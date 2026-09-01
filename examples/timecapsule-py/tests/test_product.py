@@ -16,9 +16,9 @@ class ProductLoopTests(unittest.TestCase):
     def test_world_assets_are_browser_drivable(self):
         html = Path(__file__).parents[1] / "world/index.html"
         text = html.read_text()
-        self.assertIn('button data-action="pay"', text)
-        self.assertIn('button data-action="agent/original"', text)
-        self.assertIn('button data-action="agent/fixed"', text)
+        self.assertIn('data-action="pay"', text)
+        self.assertIn('data-action="agent/original"', text)
+        self.assertIn('data-action="agent/fixed"', text)
 
 
 if __name__ == "__main__":

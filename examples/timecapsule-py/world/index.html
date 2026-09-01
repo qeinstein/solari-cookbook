@@ -1,42 +1,17 @@
 <!doctype html>
-<meta charset="utf-8">
-<title>AcmeCloud Collections</title>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AcmeCloud · Invoice 1842</title>
 <style>
-  body { font: 16px system-ui; max-width: 720px; margin: 40px auto; color: #172033; }
-  section { border: 1px solid #d9dfeb; border-radius: 12px; padding: 20px; margin: 16px 0; }
-  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-  .value { font-size: 24px; font-weight: 700; }
-  button { padding: 10px 14px; margin: 4px; cursor: pointer; }
-  #messages { min-height: 28px; white-space: pre-wrap; }
+  :root { --paper:#f7f6f1; --surface:#fffefa; --ink:#22261f; --muted:#777b70; --rule:#dcdcd3; --olive:#536047; --red:#b6493a; }
+  * { box-sizing:border-box } body { margin:0; min-height:100vh; background:var(--paper); color:var(--ink); font:14px/1.5 ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif }.app { max-width:1040px; margin:auto; padding:0 28px 65px }.bar { height:70px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid var(--rule) }.brand { display:flex; align-items:center; gap:10px; font:600 15px Georgia,serif }.mark { width:26px; height:26px; display:grid; place-items:center; border:1px solid var(--olive); border-radius:50%; font-size:10px; color:var(--olive) }.crumb { color:var(--muted); font-size:12px }
+  .hero { padding:60px 0 35px; border-bottom:1px solid var(--ink) }.eyebrow { color:var(--olive); font-size:10px; letter-spacing:.14em; font-weight:750; text-transform:uppercase }.hero h1 { margin:10px 0 7px; font:400 clamp(34px,5vw,52px)/1 Georgia,serif; letter-spacing:-.055em }.hero p { color:var(--muted); margin:0 }.columns { display:grid; grid-template-columns:1.25fr .75fr; gap:50px; padding-top:35px }.panel-title { display:flex; justify-content:space-between; align-items:baseline; border-bottom:1px solid var(--rule); padding-bottom:11px }.panel-title h2 { margin:0; font:400 21px Georgia,serif; letter-spacing:-.03em }.panel-title span { color:var(--muted); font-size:11px }
+  .invoice { margin-top:22px; background:var(--surface); border:1px solid var(--rule); padding:22px }.invoice-head { display:flex; justify-content:space-between; align-items:start; padding-bottom:20px; border-bottom:1px solid var(--rule) }.invoice-name { font:400 24px Georgia,serif }.invoice-number { color:var(--muted); font-size:12px; margin-top:3px }.badge { border-radius:20px; padding:5px 9px; background:#f1eadb; color:#8e6c32; font-size:10px; letter-spacing:.08em; font-weight:800 }.fields { display:grid; grid-template-columns:1fr 1fr; gap:18px; padding-top:20px }.field label { display:block; color:var(--muted); font-size:10px; text-transform:uppercase; letter-spacing:.1em }.field strong { display:block; margin-top:4px; font-size:14px }.field strong.paid { color:var(--olive) }.field strong.overdue { color:var(--red) }.notice { margin-top:22px; padding:14px; border-left:2px solid var(--red); background:#f7eae5; color:#74382e; font-size:12px; min-height:48px }
+  .controls { margin-top:22px; display:grid; gap:10px }.control-group { border-top:1px solid var(--rule); padding-top:15px }.control-label { display:block; color:var(--muted); font-size:10px; letter-spacing:.1em; text-transform:uppercase; margin-bottom:8px }.buttons { display:flex; flex-wrap:wrap; gap:7px }.buttons button { border:1px solid var(--rule); background:transparent; border-radius:3px; padding:8px 10px; color:var(--ink); font-size:12px }.buttons button:hover { border-color:var(--olive); color:var(--olive) }.buttons button.primary { background:var(--ink); color:#fff; border-color:var(--ink) }
+  .side { border-top:2px solid var(--olive); padding-top:17px }.side h3 { margin:0 0 18px; font:400 21px Georgia,serif }.state-row { display:flex; justify-content:space-between; padding:11px 0; border-bottom:1px solid var(--rule); font-size:12px }.state-row span { color:var(--muted) }.state-row strong { font-weight:650 }.legend { margin-top:25px; color:var(--muted); font-size:12px }.legend b { color:var(--ink); font-weight:650 }
+  @media(max-width:720px) { .app { padding:0 18px 45px }.bar { height:60px }.crumb { display:none }.hero { padding:42px 0 28px }.columns { grid-template-columns:1fr; gap:38px; padding-top:27px }.side { order:-1 } }
 </style>
-<h1>AcmeCloud Collections</h1>
-<p>Invoice <strong>INV-1842</strong> · customer: Northstar Labs</p>
-<section class="grid">
-  <div>Payment system<div id="payment" class="value"></div></div>
-  <div>CRM invoice status<div id="crm" class="value"></div></div>
-</section>
-<section>
-  <h2>World controls</h2>
-  <button data-action="pay">Customer pays</button>
-  <button data-action="webhook">Deliver payment webhook</button>
-  <button data-action="reset">Reset world</button>
-</section>
-<section>
-  <h2>Agent wakeup</h2>
-  <button data-action="agent/original">Run original agent</button>
-  <button data-action="agent/fixed">Run fixed agent</button>
-  <p id="messages"></p>
-</section>
+<div class="app"><div class="bar"><div class="brand"><div class="mark">AC</div>AcmeCloud</div><div class="crumb">Operations / Collections / Invoice 1842</div></div><section class="hero"><div class="eyebrow">Collections workspace</div><h1>Invoice 1842</h1><p>Northstar Labs · annual workspace plan · due August 31, 2026</p></section><div class="columns"><main><div class="panel-title"><h2>Invoice state</h2><span>Live world state</span></div><div class="invoice"><div class="invoice-head"><div><div class="invoice-name">Annual workspace plan</div><div class="invoice-number">INV-1842 · Northstar Labs</div></div><div class="badge" id="badge">OVERDUE</div></div><div class="fields"><div class="field"><label>Payment system</label><strong id="payment">UNPAID</strong></div><div class="field"><label>CRM record</label><strong id="crm" class="overdue">OVERDUE</strong></div></div><div class="notice" id="messages">No messages sent.</div></div><div class="controls"><div class="control-group"><span class="control-label">World controls</span><div class="buttons"><button data-action="pay">Customer pays</button><button data-action="webhook">Deliver webhook</button><button data-action="reset">Reset world</button></div></div><div class="control-group"><span class="control-label">Agent wakeup</span><div class="buttons"><button class="primary" data-action="agent/original">Run original agent</button><button data-action="agent/fixed">Run fixed agent</button></div></div></div></main><aside class="side"><h3>State at a glance</h3><div class="state-row"><span>Payment source</span><strong id="payment-side">Unpaid</strong></div><div class="state-row"><span>CRM status</span><strong id="crm-side">Overdue</strong></div><div class="state-row"><span>Webhook</span><strong id="webhook-side">Not scheduled</strong></div><p class="legend"><b>Scenario controls</b><br>Use the world controls to create a temporal race. The original agent trusts the CRM; the fixed agent verifies payment before contact.</p></aside></div></div>
 <script>
-  const $ = selector => document.querySelector(selector);
-  async function refresh() {
-    const state = await fetch('/state').then(response => response.json());
-    $('#payment').textContent = state.payment.toUpperCase();
-    $('#crm').textContent = state.crm.toUpperCase();
-    $('#messages').textContent = state.messages.length ? state.messages.join('\n') : 'No messages sent.';
-  }
-  document.querySelectorAll('button').forEach(button => button.onclick = async () => {
-    await fetch('/' + button.dataset.action, {method: 'POST'}); await refresh();
-  });
-  refresh();
+  const $ = selector => document.querySelector(selector); async function refresh() { const state=await fetch('/state').then(response=>response.json()); const paid=state.payment==='paid'; const settled=state.crm==='paid'; $('#payment').textContent=state.payment.toUpperCase(); $('#crm').textContent=state.crm.toUpperCase(); $('#payment').className=paid?'paid':''; $('#crm').className=settled?'paid':'overdue'; $('#badge').textContent=settled?'PAID':'OVERDUE'; $('#messages').textContent=state.messages.length?state.messages.join('\n'):'No messages sent.'; $('#payment-side').textContent=paid?'Paid':'Unpaid'; $('#crm-side').textContent=settled?'Paid':'Overdue'; $('#webhook-side').textContent=state.webhook_scheduled?'Delayed':'Not scheduled'; }
+  document.querySelectorAll('button').forEach(button=>button.onclick=async()=>{ await fetch('/'+button.dataset.action,{method:'POST'}); await refresh(); }); refresh();
 </script>
