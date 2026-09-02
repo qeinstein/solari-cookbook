@@ -67,15 +67,16 @@ function BoundaryCard({
 
 function CounterfactualDiff({ proof }: { proof?: CounterfactualProof }) {
   if (!proof) return null;
+  const runtimeError = proof.runtime?.status === "ERROR";
   return (
     <div className="counterfactual-diff">
       <div className="diff-title"><span>Same future manifest</span><b>{proof.verified ? "VERIFIED" : "UNVERIFIED"}</b></div>
       <div className="diff-row"><span>Environment</span><code>{shortHash(proof.original.environment_hash)}</code><strong>=</strong><code>{shortHash(proof.patched.environment_hash)}</code></div>
       <div className="diff-row"><span>Event input</span><code>{shortHash(proof.original.event_hash)}</code><strong>=</strong><code>{shortHash(proof.patched.event_hash)}</code></div>
       <div className="diff-row"><span>World assets</span><code>{shortHash(proof.original.world_asset_hash)}</code><strong>=</strong><code>{shortHash(proof.patched.world_asset_hash)}</code></div>
-      <div className="diff-row changed"><span>Agent policy</span><code>{proof.only_change.original}</code><strong>→</strong><code>{proof.only_change.patched}</code></div>
-      <p>All {proof.identical_fields.length} environment inputs match. Only <code>agent_policy</code> changes.</p>
-      {proof.runtime?.same_event_hash && proof.runtime.same_environment_hash && proof.runtime.fresh_isolation ? <p className="runtime-proof">Runtime verified · same input/environment · fresh sandbox and browser for patched replay.</p> : null}
+      <div className="diff-row changed"><span>Policy</span><code>{proof.only_change.original}</code><strong>→</strong><code>{proof.only_change.patched}</code></div>
+      <p>All {proof.identical_fields.length} environment inputs match. Only the built-in policy changes.</p>
+      {runtimeError ? <p className="runtime-error">Patched replay returned ERROR · no counterfactual runtime verification was established.</p> : proof.runtime?.verified ? <p className="runtime-proof">Runtime verified · same input/environment · fresh sandbox and browser for patched replay.</p> : null}
     </div>
   );
 }
@@ -118,21 +119,22 @@ export function Inspector({
   onAction: (action: FutureAction) => void;
 }) {
   const action = selectedAction?.futureId === future?.future_id ? selectedAction : null;
+  const executionError = future?.status === "ERROR";
   const events = action?.action === "minimize" && action.payload.minimal_events ? action.payload.minimal_events : future?.events ?? [];
   const violation = action?.action === "minimize" ? action.payload.minimal_violation : future?.violation;
   const proof = action?.payload.counterfactual_proof ?? future?.counterfactual_proof;
   return (
-    <aside className={`inspector ${future?.status === "PASS" ? "pass-inspector" : ""}`} aria-labelledby="inspector-title">
-      <div className="inspector-kicker"><span>{future?.status === "FAIL" ? violation?.type.replaceAll("_", " ") : "Invariant held"}</span><span>{future?.future_id ?? "—"}</span></div>
-      <h3 id="inspector-title">{violation?.title ?? "No unsafe contact observed"}</h3>
-      <p className="inspector-sub">{violation?.summary ?? "Every agent wakeup stayed outside stale payment and dispute intervals."}</p>
-      <div className="state-grid">
+    <aside className={`inspector ${future?.status === "PASS" ? "pass-inspector" : ""} ${executionError ? "error-inspector" : ""}`} aria-labelledby="inspector-title">
+      <div className="inspector-kicker"><span>{executionError ? "Execution error" : future?.status === "FAIL" ? violation?.type.replaceAll("_", " ") : "Invariant held"}</span><span>{future?.future_id ?? "—"}</span></div>
+      <h3 id="inspector-title">{executionError ? "Evidence unavailable" : violation?.title ?? "No unsafe contact observed"}</h3>
+      <p className="inspector-sub">{executionError ? future.error?.message ?? "The isolated execution did not complete." : violation?.summary ?? "Every agent wakeup stayed outside stale payment and dispute intervals."}</p>
+      {executionError ? <div className="execution-error" role="alert"><span>Verdict</span><strong>ERROR</strong><small>No PASS or FAIL was assigned because the environment did not complete.</small></div> : <div className="state-grid">
         <State label={violation?.source_label ?? "External sources"} value={violation?.source_value ?? "CONSISTENT"} />
         <State label={violation?.mirror_label ?? "CRM mirrors"} value={violation?.mirror_value ?? "SYNCED"} bad={Boolean(violation)} />
         <State label={violation ? "Agent belief" : "Unsafe contact"} value={violation?.agent_belief ?? "NONE"} bad={Boolean(violation)} />
-      </div>
+      </div>}
       <div className="inspector-actions">
-        <ActionButton disabled={!future || workingAction !== null} onClick={() => onAction("compare")}>Replay exact input</ActionButton>
+        <ActionButton disabled={!future || executionError || workingAction !== null} onClick={() => onAction("compare")}>Replay exact input</ActionButton>
         <ActionButton variant="secondary" disabled={!future || future.status !== "FAIL" || workingAction !== null} onClick={() => onAction("minimize")}>Minimize</ActionButton>
         <ActionButton variant="secondary" disabled={!future || future.status !== "FAIL" || workingAction !== null} onClick={() => onAction("regress")}>Save regression</ActionButton>
         <span className="action-output" role="status" aria-live="polite">{workingAction ? "Running evidence step…" : actionError || actionSummary(action)}</span>

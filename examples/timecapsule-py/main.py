@@ -60,6 +60,7 @@ def parser():
     cloud.add_argument("--futures", type=int, default=3)
     cloud.add_argument("--seed", type=int, default=0)
     cloud.add_argument("--concurrency", type=int, default=1)
+    cloud.add_argument("--max-environments", type=int, default=20)
     cloud.add_argument("--output", type=Path, default=Path("runs/cloud-latest.json"))
     benchmark = commands.add_parser("benchmark", help="matched random vs coverage-guided search benchmark")
     benchmark.add_argument("--trials", type=int, default=200)
@@ -79,7 +80,13 @@ def main():
     if args.mode in {"run", "local"}:
         local_run(args.futures, args.seed, args.output)
     elif args.mode in {"cloud", "solari"}:
-        asyncio.run(solari_run(args.futures, args.seed, args.output, args.concurrency))
+        asyncio.run(solari_run(
+            args.futures,
+            args.seed,
+            args.output,
+            args.concurrency,
+            args.max_environments,
+        ))
     elif args.mode == "benchmark":
         report = run_benchmark(args.trials, args.budget, args.seed)
         print_benchmark(report)

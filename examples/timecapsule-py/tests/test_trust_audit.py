@@ -24,8 +24,10 @@ from timecapsule.core import (
 )
 from timecapsule.evidence import counterfactual_proof
 from timecapsule.evidence import environment_manifest
+from timecapsule.runner import local_future_entry
 from timecapsule.search import Scenario, coverage_guided_search, find_failure_boundaries, _with_webhook_delay
-from timecapsule.solari_runner import EVENT_ACTIONS, browser_simulator_parity, solari_future, timestamp_observed_trace
+from timecapsule.search import SearchResult
+from timecapsule.solari_runner import EVENT_ACTIONS, browser_simulator_parity, solari_future, solari_run, timestamp_observed_trace
 import world.server as browser_world
 
 
@@ -300,6 +302,98 @@ class SolariCleanupAuditTests(unittest.IsolatedAsyncioTestCase):
                 await solari_future(future)
         self.assertTrue(tracker["created"])
         self.assertTrue(tracker["killed"])
+
+
+class SolariFailureSemanticsTests(unittest.IsolatedAsyncioTestCase):
+    def remote_result(self, future, status, fixed=False):
+        result = local_future_entry(future)
+        result.update({
+            "agent": "fixed" if fixed else "original",
+            "status": status,
+            "sandbox_id": f"{'fixed' if fixed else 'original'}-{future.future_id}",
+            "browser_session_id": f"{'fixed' if fixed else 'original'}-{future.future_id}",
+            "recording_status": "not_ready_after_30s",
+        })
+        if status == "PASS":
+            result["violation"] = None
+            result["violations"] = []
+            result["failure_modes"] = []
+        return result
+
+    def search_result(self, futures):
+        return SearchResult(
+            futures=futures,
+            candidates_evaluated=len(futures),
+            features_discovered=set(),
+            accepted_mutations=0,
+        )
+
+    async def test_original_environment_error_does_not_discard_other_futures(self):
+        futures = coverage_guided_search(3).futures
+        calls = []
+
+        async def fake_future(future, fixed=False, recording_dir=None):
+            calls.append((future.future_id, fixed))
+            if not fixed and future.future_id == futures[2].future_id:
+                raise RuntimeError("browser initialization timeout")
+            if fixed:
+                return self.remote_result(future, "PASS", fixed=True)
+            return self.remote_result(future, "FAIL" if future.future_id == futures[1].future_id else "PASS")
+
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "cloud.json"
+            with patch("timecapsule.solari_runner.cloud_api_key", return_value="test-only"), \
+                    patch("timecapsule.solari_runner.coverage_guided_search", return_value=self.search_result(futures)), \
+                    patch("timecapsule.solari_runner.solari_future", side_effect=fake_future):
+                payload = await solari_run(3, 0, output, concurrency=2, max_environments=6)
+
+            entries = payload["futures"]
+            self.assertEqual([entry["status"] for entry in entries], ["PASS", "FAIL", "ERROR"])
+            self.assertEqual(entries[1]["comparison"], {"original": "FAIL", "patched": "PASS"})
+            self.assertEqual(entries[2]["comparison"], {"original": "ERROR", "patched": "NOT_RUN"})
+            self.assertEqual(entries[2]["error"]["phase"], "original")
+            self.assertTrue(output.exists())
+            self.assertEqual(json.loads(output.read_text())["futures"][2]["status"], "ERROR")
+            self.assertEqual(payload["summary"]["completion_status"], "COMPLETE_WITH_ERRORS")
+            self.assertEqual(payload["summary"]["errors"], 1)
+            self.assertNotIn((futures[2].future_id, True), calls)
+
+    async def test_patched_error_preserves_original_failure_without_verdict(self):
+        future = coverage_guided_search(1).futures[0]
+
+        async def fake_future(candidate, fixed=False, recording_dir=None):
+            if fixed:
+                raise RuntimeError("patched environment died")
+            return self.remote_result(candidate, "FAIL")
+
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "patched-error.json"
+            original_hash = future_fingerprint(future.events)
+            with patch("timecapsule.solari_runner.cloud_api_key", return_value="test-only"), \
+                    patch("timecapsule.solari_runner.coverage_guided_search", return_value=self.search_result([future])), \
+                    patch("timecapsule.solari_runner.solari_future", side_effect=fake_future):
+                payload = await solari_run(1, 0, output, max_environments=2)
+
+            entry = payload["futures"][0]
+            self.assertEqual(entry["status"], "FAIL")
+            self.assertEqual(entry["comparison"], {"original": "FAIL", "patched": "ERROR"})
+            self.assertEqual(entry["patched_run"]["status"], "ERROR")
+            self.assertEqual(entry["patched_run"]["error"]["phase"], "patched")
+            self.assertEqual(entry["input_hash"], original_hash)
+            self.assertEqual(entry["patched_run"]["input_hash"], original_hash)
+            self.assertFalse(entry["counterfactual_proof"]["runtime"]["verified"])
+            self.assertEqual(entry["counterfactual_proof"]["runtime"]["status"], "ERROR")
+            self.assertEqual(payload["summary"]["completion_status"], "COMPLETE_WITH_ERRORS")
+            self.assertEqual(payload["summary"]["errors"], 1)
+            self.assertTrue(output.exists())
+
+    async def test_environment_budget_rejects_before_search_or_provisioning(self):
+        with patch("timecapsule.solari_runner.cloud_api_key") as key, \
+                patch("timecapsule.solari_runner.coverage_guided_search") as search:
+            with self.assertRaisesRegex(SystemExit, "can provision up to 6 environments"):
+                await solari_run(3, 0, Path("runs/should-not-exist.json"), max_environments=5)
+        key.assert_not_called()
+        search.assert_not_called()
 
 
 if __name__ == "__main__":

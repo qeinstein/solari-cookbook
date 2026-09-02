@@ -1,4 +1,4 @@
-export type FutureStatus = "PASS" | "FAIL";
+export type FutureStatus = "PASS" | "FAIL" | "ERROR";
 
 export type TimeEvent = {
   at: string;
@@ -54,6 +54,9 @@ export type CounterfactualProof = {
   original: EnvironmentManifest;
   patched: EnvironmentManifest;
   runtime?: {
+    verified?: boolean;
+    status?: FutureStatus;
+    reason?: string;
     same_event_hash?: boolean;
     same_environment_hash?: boolean;
     fresh_isolation?: boolean;
@@ -96,6 +99,7 @@ export type PatchedRun = {
   recording_keyframes?: Array<Record<string, unknown>>;
   observed?: ObservedState;
   browser_simulator_parity?: BrowserSimulatorParity;
+  error?: { code?: string; message?: string; phase?: string };
 };
 
 export type Future = {
@@ -129,6 +133,7 @@ export type Future = {
     shared_prefix_events?: number;
   };
   patched_run?: PatchedRun;
+  error?: { code?: string; message?: string; phase?: string };
 };
 
 export type CoveragePattern = {
@@ -154,6 +159,13 @@ export type RunSummary = {
   minimization_ratio?: number | null;
   environments_used?: number;
   recordings_downloaded?: number;
+  errors?: number;
+  completion_status?: "COMPLETE" | "COMPLETE_WITH_ERRORS";
+  environment_budget?: {
+    max_environments?: number;
+    worst_case_environments?: number;
+    attempted_environments?: number;
+  };
   failure_modes?: Record<string, number>;
   search?: {
     strategy?: string;

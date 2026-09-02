@@ -101,6 +101,12 @@ def local_future_entry(future: SearchFuture) -> dict[str, Any]:
 
 def build_summary(entries, event_sequences, search, wall_clock_seconds, environments_used=0):
     failures = [entry for entry in entries if entry["status"] == "FAIL"]
+    errors = [entry for entry in entries if entry["status"] == "ERROR"]
+    errors.extend(
+        entry["patched_run"]
+        for entry in entries
+        if entry.get("patched_run", {}).get("status") == "ERROR"
+    )
     future_by_id = {future.future_id: future for future in search.futures}
     original_events = sum(len(entry["events"]) for entry in failures)
     minimal_events = sum(
@@ -117,6 +123,8 @@ def build_summary(entries, event_sequences, search, wall_clock_seconds, environm
     return {
         "explored": len(entries),
         "failures": len(failures),
+        "errors": len(errors),
+        "completion_status": "COMPLETE_WITH_ERRORS" if errors else "COMPLETE",
         "failure_rate": round(len(failures) / len(entries), 4) if entries else 0,
         "failure_modes": dict(sorted(failure_modes.items())),
         "patched_replays": len(failures),

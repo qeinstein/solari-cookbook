@@ -96,7 +96,7 @@ export default function Dashboard() {
         </div>
 
         <section className="intro">
-          <div><div className="kicker">Coverage-guided temporal fuzzing</div><h1>Find the failure boundary.</h1><p>Mutate real agent workflows across time, preserve novel futures, and prove the exact input passes when only the agent policy changes.</p></div>
+          <div><div className="kicker">Coverage-guided temporal fuzzing</div><h1>Find the failure boundary.</h1><p>Mutate the collections workflow across time, preserve novel futures, and compare the exact input under the built-in original and patched policies.</p></div>
           <div className="run-info">Latest exploration<strong>{loading ? "Loading saved run…" : data?.run_id ?? "No saved run"}</strong></div>
         </section>
 

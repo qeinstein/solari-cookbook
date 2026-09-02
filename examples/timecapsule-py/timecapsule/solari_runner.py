@@ -41,6 +41,38 @@ def cloud_api_key():
     return key
 
 
+def _safe_error_message(error: Exception) -> str:
+    message = str(error).strip() or error.__class__.__name__
+    for variable in ("TIMECAPSULE_CLOUD_KEY", "SOLARI_API_KEY"):
+        secret = os.environ.get(variable)
+        if secret:
+            message = message.replace(secret, "[redacted]")
+    return message[:500]
+
+
+def cloud_error_result(future: SearchFuture, fixed: bool, error: Exception):
+    return {
+        "future_id": future.future_id,
+        "seed": future.seed,
+        "status": "ERROR",
+        "agent": "fixed" if fixed else "original",
+        "invariant": INVARIANT_ID,
+        "input_hash": future_fingerprint(future.events),
+        "events": [event.as_dict() for event in future.events],
+        "error": {
+            "code": error.__class__.__name__,
+            "message": _safe_error_message(error),
+            "phase": "patched" if fixed else "original",
+        },
+        "search": {
+            "parent_future_id": future.parent_future_id,
+            "mutation": future.mutation,
+            "novel_features": sorted(future.novel_features),
+            "shared_prefix_events": future.shared_prefix_events,
+        },
+    }
+
+
 async def goto_preview(page, preview_url: str):
     for attempt in range(8):
         try:
@@ -323,10 +355,21 @@ async def solari_run(
     seed_start: int,
     output: Path,
     concurrency: int = 1,
+    max_environments: int = 20,
 ):
-    cloud_api_key()
+    if count < 1:
+        raise SystemExit("--futures must be at least 1")
     if concurrency < 1:
         raise SystemExit("--concurrency must be at least 1")
+    if max_environments < 1:
+        raise SystemExit("--max-environments must be at least 1")
+    worst_case_environments = count * 2
+    if worst_case_environments > max_environments:
+        raise SystemExit(
+            f"--futures {count} can provision up to {worst_case_environments} "
+            f"environments; raise --max-environments above {max_environments}"
+        )
+    cloud_api_key()
     started = perf_counter()
     search = coverage_guided_search(count, seed_start)
     recording_dir = output.parent / "replays"
@@ -334,7 +377,10 @@ async def solari_run(
 
     async def bounded_future(future, fixed=False):
         async with semaphore:
-            return await solari_future(future, fixed=fixed, recording_dir=recording_dir)
+            try:
+                return await solari_future(future, fixed=fixed, recording_dir=recording_dir)
+            except Exception as error:
+                return cloud_error_result(future, fixed, error)
 
     results = await asyncio.gather(*(bounded_future(future) for future in search.futures))
     failing = [
@@ -353,18 +399,33 @@ async def solari_run(
             "patched": candidate["status"] if candidate else "NOT_RUN",
         }
         if candidate:
-            result["counterfactual_proof"]["runtime"] = {
-                "same_event_hash": candidate["input_hash"] == result["input_hash"],
-                "same_environment_hash": candidate["counterfactual_proof"]["original"]["environment_hash"] == result["counterfactual_proof"]["original"]["environment_hash"],
-                "fresh_isolation": (
+            if candidate["status"] == "ERROR":
+                result["counterfactual_proof"]["runtime"] = {
+                    "verified": False,
+                    "status": "ERROR",
+                    "same_event_hash": candidate["input_hash"] == result["input_hash"],
+                    "same_environment_hash": False,
+                    "fresh_isolation": False,
+                    "reason": "patched replay did not complete; no runtime proof was established",
+                }
+            else:
+                same_event_hash = candidate["input_hash"] == result["input_hash"]
+                same_environment_hash = candidate["counterfactual_proof"]["original"]["environment_hash"] == result["counterfactual_proof"]["original"]["environment_hash"]
+                fresh_isolation = (
                     candidate["sandbox_id"] != result["sandbox_id"]
                     and candidate["browser_session_id"] != result["browser_session_id"]
-                ),
-                "original_sandbox_id": result["sandbox_id"],
-                "patched_sandbox_id": candidate["sandbox_id"],
-                "original_browser_session_id": result["browser_session_id"],
-                "patched_browser_session_id": candidate["browser_session_id"],
-            }
+                )
+                result["counterfactual_proof"]["runtime"] = {
+                    "verified": same_event_hash and same_environment_hash and fresh_isolation,
+                    "status": candidate["status"],
+                    "same_event_hash": same_event_hash,
+                    "same_environment_hash": same_environment_hash,
+                    "fresh_isolation": fresh_isolation,
+                    "original_sandbox_id": result["sandbox_id"],
+                    "patched_sandbox_id": candidate["sandbox_id"],
+                    "original_browser_session_id": result["browser_session_id"],
+                    "patched_browser_session_id": candidate["browser_session_id"],
+                }
             result["patched_run"] = {
                 key: candidate[key]
                 for key in (
@@ -380,6 +441,7 @@ async def solari_run(
                     "recording_keyframes",
                     "observed",
                     "browser_simulator_parity",
+                    "error",
                 )
                 if key in candidate
             }
@@ -394,6 +456,11 @@ async def solari_run(
     summary["recordings_downloaded"] = sum(
         result.get("recording_status") == "downloaded" for result in results + patched
     )
+    summary["environment_budget"] = {
+        "max_environments": max_environments,
+        "worst_case_environments": worst_case_environments,
+        "attempted_environments": len(results) + len(patched),
+    }
     payload = {
         "run_id": f"solari-{seed_start}-{seed_start + count - 1}",
         "execution_mode": "solari",
@@ -408,6 +475,8 @@ async def solari_run(
     print(f"Failures found: {len(failing)} {summary['failure_modes']}")
     print(f"Patched replays: {len(patched)}")
     print(f"Environments used: {summary['environments_used']}")
+    print(f"Experiment: {summary['completion_status']}")
+    print(f"Runtime errors: {summary['errors']}")
     print(f"Wall clock: {summary['wall_clock_seconds']:.4f}s")
     print(f"Run saved: {output}")
     for result in results:

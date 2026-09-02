@@ -28,6 +28,9 @@ from timecapsule.search import Scenario, coverage_guided_search, find_failure_bo
 from http.server import ThreadingHTTPServer
 
 
+EXAMPLE_ROOT = Path(__file__).parents[1]
+
+
 class ProductLoopTests(unittest.TestCase):
     def test_temporal_failure_minimizes_and_patch_replays(self):
         events = generate_future(0)
@@ -229,6 +232,23 @@ class ProductLoopTests(unittest.TestCase):
         self.assertIn("parent_future_id", tree.read_text())
         self.assertIn('className="docs-link"', page.read_text())
         self.assertIn("actionError && selected && actionError.futureId === selected.future_id", page.read_text())
+
+    def test_public_claims_are_scoped_to_the_implemented_scenario(self):
+        root_readme = (EXAMPLE_ROOT / "../../README.md").resolve()
+        example_readme = EXAMPLE_ROOT / "README.md"
+        for path in (root_readme, example_readme):
+            text = path.read_text().lower()
+            self.assertIn("current implementation demonstrates", text)
+            self.assertIn("built-in original", text)
+            self.assertIn("not an arbitrary-agent runner", text)
+            self.assertNotIn("your ai agent fails", text)
+            self.assertNotIn("any agent", text)
+            self.assertNotIn("before deploying your agents", text)
+
+        dashboard = (EXAMPLE_ROOT / "dashboard/app/page.tsx").read_text()
+        inspector = (EXAMPLE_ROOT / "dashboard/components/Inspector.tsx").read_text()
+        self.assertIn("built-in original and patched policies", dashboard)
+        self.assertIn("Only the built-in policy changes", inspector)
 
     def test_local_run_persists_patch_outcomes(self):
         with tempfile.TemporaryDirectory() as directory:
