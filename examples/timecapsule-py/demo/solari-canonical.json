@@ -1,0 +1,1351 @@
+{
+  "run_id": "solari-0-2",
+  "execution_mode": "solari",
+  "started_at": "2026-09-01T23:54:15.729274+01:00",
+  "futures": [
+    {
+      "future_id": "future-0",
+      "seed": 4,
+      "status": "PASS",
+      "agent": "original",
+      "invariant": "no_contact_while_external_state_is_stale",
+      "sandbox_id": "ZGVza3RvcC1wb29sLWktMDgxOGI5YTg2ZDkyNjFhNmE6dm1fMDAwMDU1OmNtdGl3M2JxcjAwOXVucjAxa2xuYWx6eGE6MTc4ODMwMzExNTk1Nw.6GURohc3dq20qrPsLkKjUTgD7pN70_7-v88sbkbTffU",
+      "browser_session_id": "ip-10-0-10-130:bc173b87-8dc0-4c5a-b3c4-9114c726d672:cmtiw3bqr009unr01klnalzxa:1788303120123.Y_pyP8isM2safWcP0tZDOg",
+      "input_hash": "75978c2be1cd6660b9ffd38172dabed757f7db6eeb552313c7ed23aeffa099b4",
+      "violation": null,
+      "violations": [],
+      "failure_modes": [],
+      "boundaries": [],
+      "counterfactual_proof": {
+        "verified": true,
+        "identical_fields": [
+          "environment_hash",
+          "event_hash",
+          "world_contract",
+          "world_asset_hash",
+          "invoice_id",
+          "initial_state_hash",
+          "fixture_hash",
+          "event_count"
+        ],
+        "differing_fields": [
+          "agent_policy"
+        ],
+        "only_change": {
+          "field": "agent_policy",
+          "original": "trust_crm_only",
+          "patched": "verify_payment_and_dispute_sources"
+        },
+        "original": {
+          "environment_hash": "b0ac7efee5a197c2764f101bdfeed4990cbae705ca7097a003b52c771116a303",
+          "event_hash": "75978c2be1cd6660b9ffd38172dabed757f7db6eeb552313c7ed23aeffa099b4",
+          "world_contract": "collections-world-v2",
+          "world_asset_hash": "2f289fc37531993b3c1ccb1cc01415fb771bf6451ef4fc82a284687c3fc57576",
+          "invoice_id": "INV-1842",
+          "initial_state_hash": "d27cb2e8f72c4978c14a78e090b74ee5b33941e928118fd246af7af5b754db90",
+          "fixture_hash": "ea51c2292214b0ae9f09e801a8dd9fef04fd12f78a0a345fe7f14c732d52e40d",
+          "event_count": 7,
+          "agent_policy": "trust_crm_only"
+        },
+        "patched": {
+          "environment_hash": "b0ac7efee5a197c2764f101bdfeed4990cbae705ca7097a003b52c771116a303",
+          "event_hash": "75978c2be1cd6660b9ffd38172dabed757f7db6eeb552313c7ed23aeffa099b4",
+          "world_contract": "collections-world-v2",
+          "world_asset_hash": "2f289fc37531993b3c1ccb1cc01415fb771bf6451ef4fc82a284687c3fc57576",
+          "invoice_id": "INV-1842",
+          "initial_state_hash": "d27cb2e8f72c4978c14a78e090b74ee5b33941e928118fd246af7af5b754db90",
+          "fixture_hash": "ea51c2292214b0ae9f09e801a8dd9fef04fd12f78a0a345fe7f14c732d52e40d",
+          "event_count": 7,
+          "agent_policy": "verify_payment_and_dispute_sources"
+        }
+      },
+      "events": [
+        {
+          "at": "2026-09-01T09:00:00",
+          "kind": "invoice_created",
+          "payload": {}
+        },
+        {
+          "at": "2026-09-05T03:00:00",
+          "kind": "dispute_opened",
+          "payload": {
+            "webhook_delay_minutes": 0
+          }
+        },
+        {
+          "at": "2026-09-05T03:00:00",
+          "kind": "dispute_webhook",
+          "payload": {}
+        },
+        {
+          "at": "2026-09-05T03:00:00",
+          "kind": "agent_wakeup",
+          "payload": {}
+        },
+        {
+          "at": "2026-09-05T09:00:00",
+          "kind": "customer_payment",
+          "payload": {
+            "webhook_delay_hours": 12.0
+          }
+        },
+        {
+          "at": "2026-09-05T09:00:00",
+          "kind": "agent_wakeup",
+          "payload": {}
+        },
+        {
+          "at": "2026-09-05T21:00:00",
+          "kind": "payment_webhook",
+          "payload": {}
+        }
+      ],
+      "search": {
+        "parent_future_id": null,
+        "mutation": "seed",
+        "novel_features": [
+          "dispute-delay:zero",
+          "dispute-window:after",
+          "kind:agent_wakeup",
+          "kind:customer_payment",
+          "kind:dispute_opened",
+          "kind:dispute_webhook",
+          "kind:invoice_created",
+          "kind:payment_webhook",
+          "outcome-signature:safe",
+          "outcome:safe",
+          "pair:agent_wakeup>customer_payment",
+          "pair:agent_wakeup>payment_webhook",
+          "pair:customer_payment>agent_wakeup",
+          "pair:dispute_opened>dispute_webhook",
+          "pair:dispute_webhook>agent_wakeup",
+          "pair:invoice_created>dispute_opened",
+          "payment-delay:medium",
+          "payment-window:before",
+          "payment-window:stale",
+          "wake-count:2"
+        ],
+        "shared_prefix_events": 1
+      },
+      "observed": {
+        "payment": "PAID",
+        "crm": "PAID",
+        "dispute": "OPEN",
+        "crm_dispute": "OPEN",
+        "messages": "No messages sent.",
+        "message_count": 0,
+        "trace": [
+          {
+            "action": "dispute",
+            "payment": "unpaid",
+            "crm": "overdue",
+            "dispute": "open",
+            "crm_dispute": "none",
+            "webhook_scheduled": false,
+            "dispute_webhook_scheduled": true,
+            "at": "2026-09-05T03:00:00"
+          },
+          {
+            "action": "dispute-webhook",
+            "payment": "unpaid",
+            "crm": "overdue",
+            "dispute": "open",
+            "crm_dispute": "open",
+            "webhook_scheduled": false,
+            "dispute_webhook_scheduled": true,
+            "at": "2026-09-05T03:00:00"
+          },
+          {
+            "action": "agent/original",
+            "payment": "unpaid",
+            "crm": "overdue",
+            "dispute": "open",
+            "crm_dispute": "open",
+            "webhook_scheduled": false,
+            "dispute_webhook_scheduled": true,
+            "sent": false,
+            "at": "2026-09-05T03:00:00"
+          },
+          {
+            "action": "pay",
+            "payment": "paid",
+            "crm": "overdue",
+            "dispute": "open",
+            "crm_dispute": "open",
+            "webhook_scheduled": true,
+            "dispute_webhook_scheduled": true,
+            "at": "2026-09-05T09:00:00"
+          },
+          {
+            "action": "agent/original",
+            "payment": "paid",
+            "crm": "overdue",
+            "dispute": "open",
+            "crm_dispute": "open",
+            "webhook_scheduled": true,
+            "dispute_webhook_scheduled": true,
+            "sent": false,
+            "at": "2026-09-05T09:00:00"
+          },
+          {
+            "action": "webhook",
+            "payment": "paid",
+            "crm": "paid",
+            "dispute": "open",
+            "crm_dispute": "open",
+            "webhook_scheduled": true,
+            "dispute_webhook_scheduled": true,
+            "at": "2026-09-05T21:00:00"
+          }
+        ]
+      },
+      "recording_keyframes": [
+        {
+          "action": "dispute",
+          "payment": "unpaid",
+          "crm": "overdue",
+          "dispute": "open",
+          "crm_dispute": "none",
+          "webhook_scheduled": false,
+          "dispute_webhook_scheduled": true,
+          "at": "2026-09-05T03:00:00"
+        },
+        {
+          "action": "dispute-webhook",
+          "payment": "unpaid",
+          "crm": "overdue",
+          "dispute": "open",
+          "crm_dispute": "open",
+          "webhook_scheduled": false,
+          "dispute_webhook_scheduled": true,
+          "at": "2026-09-05T03:00:00"
+        },
+        {
+          "action": "agent/original",
+          "payment": "unpaid",
+          "crm": "overdue",
+          "dispute": "open",
+          "crm_dispute": "open",
+          "webhook_scheduled": false,
+          "dispute_webhook_scheduled": true,
+          "sent": false,
+          "at": "2026-09-05T03:00:00"
+        },
+        {
+          "action": "pay",
+          "payment": "paid",
+          "crm": "overdue",
+          "dispute": "open",
+          "crm_dispute": "open",
+          "webhook_scheduled": true,
+          "dispute_webhook_scheduled": true,
+          "at": "2026-09-05T09:00:00"
+        },
+        {
+          "action": "agent/original",
+          "payment": "paid",
+          "crm": "overdue",
+          "dispute": "open",
+          "crm_dispute": "open",
+          "webhook_scheduled": true,
+          "dispute_webhook_scheduled": true,
+          "sent": false,
+          "at": "2026-09-05T09:00:00"
+        },
+        {
+          "action": "webhook",
+          "payment": "paid",
+          "crm": "paid",
+          "dispute": "open",
+          "crm_dispute": "open",
+          "webhook_scheduled": true,
+          "dispute_webhook_scheduled": true,
+          "at": "2026-09-05T21:00:00"
+        }
+      ],
+      "browser_simulator_parity": {
+        "verified": true,
+        "trace_state_match": true,
+        "state_match": true,
+        "message_count_match": true,
+        "violation_match": true,
+        "simulator_failure_modes": []
+      },
+      "recording_status": "downloaded",
+      "recording_path": "demo/replays/future-0-original.ndjson",
+      "recording_bytes": 40102,
+      "recording_events": 71,
+      "comparison": {
+        "original": "PASS",
+        "patched": "NOT_RUN"
+      }
+    },
+    {
+      "future_id": "future-1",
+      "seed": 12,
+      "status": "FAIL",
+      "agent": "original",
+      "invariant": "no_contact_while_external_state_is_stale",
+      "sandbox_id": "ZGVza3RvcC1wb29sLWktMDgxOGI5YTg2ZDkyNjFhNmE6dm1fMDAwMDU2OmNtdGl3M2JxcjAwOXVucjAxa2xuYWx6eGE6MTc4ODMwMzE0MDgyOA.yvGBKDC5x3B0jaP3B25ByIM-8u4Ph2qwNxh-Gc_Bqjk",
+      "browser_session_id": "ip-10-0-10-130:5f86f9a0-b1e8-4d01-98f2-f82733d620c6:cmtiw3bqr009unr01klnalzxa:1788303144383.4AuV3n_QZVm1HoOB3cKEsw",
+      "input_hash": "27788866f98e160e793cb3de15812682e3d3681b45dab361352be0f3b56c29fb",
+      "violation": {
+        "type": "stale_payment_contact",
+        "title": "Contact after payment",
+        "summary": "Payment was settled while the CRM still marked the invoice overdue.",
+        "at": "2026-09-04T09:00:00",
+        "source_label": "Payment system",
+        "source_value": "PAID",
+        "mirror_label": "CRM invoice",
+        "mirror_value": "OVERDUE",
+        "agent_belief": "OVERDUE",
+        "message": "Your payment remains overdue."
+      },
+      "violations": [
+        {
+          "type": "stale_payment_contact",
+          "title": "Contact after payment",
+          "summary": "Payment was settled while the CRM still marked the invoice overdue.",
+          "at": "2026-09-04T09:00:00",
+          "source_label": "Payment system",
+          "source_value": "PAID",
+          "mirror_label": "CRM invoice",
+          "mirror_value": "OVERDUE",
+          "agent_belief": "OVERDUE",
+          "message": "Your payment remains overdue."
+        }
+      ],
+      "failure_modes": [
+        "stale_payment_contact"
+      ],
+      "boundaries": [
+        {
+          "failure_type": "stale_payment_contact",
+          "variable": "webhook_delay_minutes",
+          "label": "Payment webhook lag",
+          "last_passing_minutes": 0,
+          "first_failing_minutes": 1,
+          "failure_begins_at": "1m",
+          "resolution_minutes": 1
+        }
+      ],
+      "counterfactual_proof": {
+        "verified": true,
+        "identical_fields": [
+          "environment_hash",
+          "event_hash",
+          "world_contract",
+          "world_asset_hash",
+          "invoice_id",
+          "initial_state_hash",
+          "fixture_hash",
+          "event_count"
+        ],
+        "differing_fields": [
+          "agent_policy"
+        ],
+        "only_change": {
+          "field": "agent_policy",
+          "original": "trust_crm_only",
+          "patched": "verify_payment_and_dispute_sources"
+        },
+        "original": {
+          "environment_hash": "336fb657f36b1a01a6408c3c9a2b61c62ee26bd6853d3fe2e72405337aa06f07",
+          "event_hash": "27788866f98e160e793cb3de15812682e3d3681b45dab361352be0f3b56c29fb",
+          "world_contract": "collections-world-v2",
+          "world_asset_hash": "2f289fc37531993b3c1ccb1cc01415fb771bf6451ef4fc82a284687c3fc57576",
+          "invoice_id": "INV-1842",
+          "initial_state_hash": "d27cb2e8f72c4978c14a78e090b74ee5b33941e928118fd246af7af5b754db90",
+          "fixture_hash": "ea51c2292214b0ae9f09e801a8dd9fef04fd12f78a0a345fe7f14c732d52e40d",
+          "event_count": 8,
+          "agent_policy": "trust_crm_only"
+        },
+        "patched": {
+          "environment_hash": "336fb657f36b1a01a6408c3c9a2b61c62ee26bd6853d3fe2e72405337aa06f07",
+          "event_hash": "27788866f98e160e793cb3de15812682e3d3681b45dab361352be0f3b56c29fb",
+          "world_contract": "collections-world-v2",
+          "world_asset_hash": "2f289fc37531993b3c1ccb1cc01415fb771bf6451ef4fc82a284687c3fc57576",
+          "invoice_id": "INV-1842",
+          "initial_state_hash": "d27cb2e8f72c4978c14a78e090b74ee5b33941e928118fd246af7af5b754db90",
+          "fixture_hash": "ea51c2292214b0ae9f09e801a8dd9fef04fd12f78a0a345fe7f14c732d52e40d",
+          "event_count": 8,
+          "agent_policy": "verify_payment_and_dispute_sources"
+        },
+        "runtime": {
+          "same_event_hash": true,
+          "same_environment_hash": true,
+          "fresh_isolation": true,
+          "original_sandbox_id": "ZGVza3RvcC1wb29sLWktMDgxOGI5YTg2ZDkyNjFhNmE6dm1fMDAwMDU2OmNtdGl3M2JxcjAwOXVucjAxa2xuYWx6eGE6MTc4ODMwMzE0MDgyOA.yvGBKDC5x3B0jaP3B25ByIM-8u4Ph2qwNxh-Gc_Bqjk",
+          "patched_sandbox_id": "ZGVza3RvcC1wb29sLWktMDgxOGI5YTg2ZDkyNjFhNmE6dm1fMDAwMDU5OmNtdGl3M2JxcjAwOXVucjAxa2xuYWx6eGE6MTc4ODMwMzE5MDcwNg.UMoxWshW0_kNcQ2z9tSjbb4aUt1ZHQsIA8AwtgDWTnY",
+          "original_browser_session_id": "ip-10-0-10-130:5f86f9a0-b1e8-4d01-98f2-f82733d620c6:cmtiw3bqr009unr01klnalzxa:1788303144383.4AuV3n_QZVm1HoOB3cKEsw",
+          "patched_browser_session_id": "ip-10-0-11-229:e810cc88-6d6a-4d2b-a1d7-e61d55b68832:cmtiw3bqr009unr01klnalzxa:1788303194697._wBEQEp9LzOgpTvgbzU3mA"
+        }
+      },
+      "events": [
+        {
+          "at": "2026-09-01T09:00:00",
+          "kind": "invoice_created",
+          "payload": {}
+        },
+        {
+          "at": "2026-09-03T09:00:00",
+          "kind": "agent_wakeup",
+          "payload": {}
+        },
+        {
+          "at": "2026-09-04T09:00:00",
+          "kind": "customer_payment",
+          "payload": {
+            "webhook_delay_hours": 2.0
+          }
+        },
+        {
+          "at": "2026-09-04T09:00:00",
+          "kind": "agent_wakeup",
+          "payload": {}
+        },
+        {
+          "at": "2026-09-04T11:00:00",
+          "kind": "payment_webhook",
+          "payload": {}
+        },
+        {
+          "at": "2026-09-05T15:00:00",
+          "kind": "dispute_opened",
+          "payload": {
+            "webhook_delay_minutes": 720
+          }
+        },
+        {
+          "at": "2026-09-05T15:00:00",
+          "kind": "agent_wakeup",
+          "payload": {}
+        },
+        {
+          "at": "2026-09-06T03:00:00",
+          "kind": "dispute_webhook",
+          "payload": {}
+        }
+      ],
+      "search": {
+        "parent_future_id": null,
+        "mutation": "seed",
+        "novel_features": [
+          "dispute-delay:medium",
+          "dispute-window:active",
+          "dispute-window:before",
+          "failure:stale_payment_contact",
+          "outcome-signature:stale_payment_contact",
+          "pair:agent_wakeup>dispute_webhook",
+          "pair:dispute_opened>agent_wakeup",
+          "pair:invoice_created>agent_wakeup",
+          "pair:payment_webhook>dispute_opened",
+          "payment-delay:short",
+          "payment-window:after",
+          "wake-count:3"
+        ],
+        "shared_prefix_events": 1
+      },
+      "observed": {
+        "payment": "PAID",
+        "crm": "PAID",
+        "dispute": "OPEN",
+        "crm_dispute": "OPEN",
+        "messages": "Your payment remains overdue. Your payment remains overdue.",
+        "message_count": 2,
+        "trace": [
+          {
+            "action": "agent/original",
+            "payment": "unpaid",
+            "crm": "overdue",
+            "dispute": "none",
+            "crm_dispute": "none",
+            "webhook_scheduled": false,
+            "dispute_webhook_scheduled": false,
+            "sent": true,
+            "at": "2026-09-03T09:00:00"
+          },
+          {
+            "action": "pay",
+            "payment": "paid",
+            "crm": "overdue",
+            "dispute": "none",
+            "crm_dispute": "none",
+            "webhook_scheduled": true,
+            "dispute_webhook_scheduled": false,
+            "at": "2026-09-04T09:00:00"
+          },
+          {
+            "action": "agent/original",
+            "payment": "paid",
+            "crm": "overdue",
+            "dispute": "none",
+            "crm_dispute": "none",
+            "webhook_scheduled": true,
+            "dispute_webhook_scheduled": false,
+            "sent": true,
+            "at": "2026-09-04T09:00:00"
+          },
+          {
+            "action": "webhook",
+            "payment": "paid",
+            "crm": "paid",
+            "dispute": "none",
+            "crm_dispute": "none",
+            "webhook_scheduled": true,
+            "dispute_webhook_scheduled": false,
+            "at": "2026-09-04T11:00:00"
+          },
+          {
+            "action": "dispute",
+            "payment": "paid",
+            "crm": "paid",
+            "dispute": "open",
+            "crm_dispute": "none",
+            "webhook_scheduled": true,
+            "dispute_webhook_scheduled": true,
+            "at": "2026-09-05T15:00:00"
+          },
+          {
+            "action": "agent/original",
+            "payment": "paid",
+            "crm": "paid",
+            "dispute": "open",
+            "crm_dispute": "none",
+            "webhook_scheduled": true,
+            "dispute_webhook_scheduled": true,
+            "sent": false,
+            "at": "2026-09-05T15:00:00"
+          },
+          {
+            "action": "dispute-webhook",
+            "payment": "paid",
+            "crm": "paid",
+            "dispute": "open",
+            "crm_dispute": "open",
+            "webhook_scheduled": true,
+            "dispute_webhook_scheduled": true,
+            "at": "2026-09-06T03:00:00"
+          }
+        ]
+      },
+      "recording_keyframes": [
+        {
+          "action": "agent/original",
+          "payment": "unpaid",
+          "crm": "overdue",
+          "dispute": "none",
+          "crm_dispute": "none",
+          "webhook_scheduled": false,
+          "dispute_webhook_scheduled": false,
+          "sent": true,
+          "at": "2026-09-03T09:00:00"
+        },
+        {
+          "action": "pay",
+          "payment": "paid",
+          "crm": "overdue",
+          "dispute": "none",
+          "crm_dispute": "none",
+          "webhook_scheduled": true,
+          "dispute_webhook_scheduled": false,
+          "at": "2026-09-04T09:00:00"
+        },
+        {
+          "action": "agent/original",
+          "payment": "paid",
+          "crm": "overdue",
+          "dispute": "none",
+          "crm_dispute": "none",
+          "webhook_scheduled": true,
+          "dispute_webhook_scheduled": false,
+          "sent": true,
+          "at": "2026-09-04T09:00:00"
+        },
+        {
+          "action": "webhook",
+          "payment": "paid",
+          "crm": "paid",
+          "dispute": "none",
+          "crm_dispute": "none",
+          "webhook_scheduled": true,
+          "dispute_webhook_scheduled": false,
+          "at": "2026-09-04T11:00:00"
+        },
+        {
+          "action": "dispute",
+          "payment": "paid",
+          "crm": "paid",
+          "dispute": "open",
+          "crm_dispute": "none",
+          "webhook_scheduled": true,
+          "dispute_webhook_scheduled": true,
+          "at": "2026-09-05T15:00:00"
+        },
+        {
+          "action": "agent/original",
+          "payment": "paid",
+          "crm": "paid",
+          "dispute": "open",
+          "crm_dispute": "none",
+          "webhook_scheduled": true,
+          "dispute_webhook_scheduled": true,
+          "sent": false,
+          "at": "2026-09-05T15:00:00"
+        },
+        {
+          "action": "dispute-webhook",
+          "payment": "paid",
+          "crm": "paid",
+          "dispute": "open",
+          "crm_dispute": "open",
+          "webhook_scheduled": true,
+          "dispute_webhook_scheduled": true,
+          "at": "2026-09-06T03:00:00"
+        }
+      ],
+      "browser_simulator_parity": {
+        "verified": true,
+        "trace_state_match": true,
+        "state_match": true,
+        "message_count_match": true,
+        "violation_match": true,
+        "simulator_failure_modes": [
+          "stale_payment_contact"
+        ]
+      },
+      "recording_status": "downloaded",
+      "recording_path": "demo/replays/future-1-original.ndjson",
+      "recording_bytes": 44652,
+      "recording_events": 80,
+      "comparison": {
+        "original": "FAIL",
+        "patched": "PASS"
+      },
+      "patched_run": {
+        "agent": "fixed",
+        "status": "PASS",
+        "input_hash": "27788866f98e160e793cb3de15812682e3d3681b45dab361352be0f3b56c29fb",
+        "sandbox_id": "ZGVza3RvcC1wb29sLWktMDgxOGI5YTg2ZDkyNjFhNmE6dm1fMDAwMDU5OmNtdGl3M2JxcjAwOXVucjAxa2xuYWx6eGE6MTc4ODMwMzE5MDcwNg.UMoxWshW0_kNcQ2z9tSjbb4aUt1ZHQsIA8AwtgDWTnY",
+        "browser_session_id": "ip-10-0-11-229:e810cc88-6d6a-4d2b-a1d7-e61d55b68832:cmtiw3bqr009unr01klnalzxa:1788303194697._wBEQEp9LzOgpTvgbzU3mA",
+        "recording_path": "demo/replays/future-1-fixed.ndjson",
+        "recording_bytes": 44408,
+        "recording_events": 80,
+        "recording_status": "downloaded",
+        "recording_keyframes": [
+          {
+            "action": "agent/fixed",
+            "payment": "unpaid",
+            "crm": "overdue",
+            "dispute": "none",
+            "crm_dispute": "none",
+            "webhook_scheduled": false,
+            "dispute_webhook_scheduled": false,
+            "sent": true,
+            "at": "2026-09-03T09:00:00"
+          },
+          {
+            "action": "pay",
+            "payment": "paid",
+            "crm": "overdue",
+            "dispute": "none",
+            "crm_dispute": "none",
+            "webhook_scheduled": true,
+            "dispute_webhook_scheduled": false,
+            "at": "2026-09-04T09:00:00"
+          },
+          {
+            "action": "agent/fixed",
+            "payment": "paid",
+            "crm": "overdue",
+            "dispute": "none",
+            "crm_dispute": "none",
+            "webhook_scheduled": true,
+            "dispute_webhook_scheduled": false,
+            "sent": false,
+            "at": "2026-09-04T09:00:00"
+          },
+          {
+            "action": "webhook",
+            "payment": "paid",
+            "crm": "paid",
+            "dispute": "none",
+            "crm_dispute": "none",
+            "webhook_scheduled": true,
+            "dispute_webhook_scheduled": false,
+            "at": "2026-09-04T11:00:00"
+          },
+          {
+            "action": "dispute",
+            "payment": "paid",
+            "crm": "paid",
+            "dispute": "open",
+            "crm_dispute": "none",
+            "webhook_scheduled": true,
+            "dispute_webhook_scheduled": true,
+            "at": "2026-09-05T15:00:00"
+          },
+          {
+            "action": "agent/fixed",
+            "payment": "paid",
+            "crm": "paid",
+            "dispute": "open",
+            "crm_dispute": "none",
+            "webhook_scheduled": true,
+            "dispute_webhook_scheduled": true,
+            "sent": false,
+            "at": "2026-09-05T15:00:00"
+          },
+          {
+            "action": "dispute-webhook",
+            "payment": "paid",
+            "crm": "paid",
+            "dispute": "open",
+            "crm_dispute": "open",
+            "webhook_scheduled": true,
+            "dispute_webhook_scheduled": true,
+            "at": "2026-09-06T03:00:00"
+          }
+        ],
+        "observed": {
+          "payment": "PAID",
+          "crm": "PAID",
+          "dispute": "OPEN",
+          "crm_dispute": "OPEN",
+          "messages": "Your payment remains overdue.",
+          "message_count": 1,
+          "trace": [
+            {
+              "action": "agent/fixed",
+              "payment": "unpaid",
+              "crm": "overdue",
+              "dispute": "none",
+              "crm_dispute": "none",
+              "webhook_scheduled": false,
+              "dispute_webhook_scheduled": false,
+              "sent": true,
+              "at": "2026-09-03T09:00:00"
+            },
+            {
+              "action": "pay",
+              "payment": "paid",
+              "crm": "overdue",
+              "dispute": "none",
+              "crm_dispute": "none",
+              "webhook_scheduled": true,
+              "dispute_webhook_scheduled": false,
+              "at": "2026-09-04T09:00:00"
+            },
+            {
+              "action": "agent/fixed",
+              "payment": "paid",
+              "crm": "overdue",
+              "dispute": "none",
+              "crm_dispute": "none",
+              "webhook_scheduled": true,
+              "dispute_webhook_scheduled": false,
+              "sent": false,
+              "at": "2026-09-04T09:00:00"
+            },
+            {
+              "action": "webhook",
+              "payment": "paid",
+              "crm": "paid",
+              "dispute": "none",
+              "crm_dispute": "none",
+              "webhook_scheduled": true,
+              "dispute_webhook_scheduled": false,
+              "at": "2026-09-04T11:00:00"
+            },
+            {
+              "action": "dispute",
+              "payment": "paid",
+              "crm": "paid",
+              "dispute": "open",
+              "crm_dispute": "none",
+              "webhook_scheduled": true,
+              "dispute_webhook_scheduled": true,
+              "at": "2026-09-05T15:00:00"
+            },
+            {
+              "action": "agent/fixed",
+              "payment": "paid",
+              "crm": "paid",
+              "dispute": "open",
+              "crm_dispute": "none",
+              "webhook_scheduled": true,
+              "dispute_webhook_scheduled": true,
+              "sent": false,
+              "at": "2026-09-05T15:00:00"
+            },
+            {
+              "action": "dispute-webhook",
+              "payment": "paid",
+              "crm": "paid",
+              "dispute": "open",
+              "crm_dispute": "open",
+              "webhook_scheduled": true,
+              "dispute_webhook_scheduled": true,
+              "at": "2026-09-06T03:00:00"
+            }
+          ]
+        },
+        "browser_simulator_parity": {
+          "verified": true,
+          "trace_state_match": true,
+          "state_match": true,
+          "message_count_match": true,
+          "violation_match": true,
+          "simulator_failure_modes": []
+        }
+      }
+    },
+    {
+      "future_id": "future-2",
+      "seed": 21,
+      "status": "FAIL",
+      "agent": "original",
+      "invariant": "no_contact_while_external_state_is_stale",
+      "sandbox_id": "ZGVza3RvcC1wb29sLWktMDgxOGI5YTg2ZDkyNjFhNmE6dm1fMDAwMDU4OmNtdGl3M2JxcjAwOXVucjAxa2xuYWx6eGE6MTc4ODMwMzE2NTk5MA.X-HAc-PQ7Enp9mkO36-5DOPv9x51vU0C-vOIl_dHQTY",
+      "browser_session_id": "ip-10-0-10-130:337a2b12-7aa9-49a7-907b-a04a12ef577b:cmtiw3bqr009unr01klnalzxa:1788303169457.sY-yqjIzbFRrjMql7H6lDw",
+      "input_hash": "15f733e92992a1eb92060a2043b6ebd98117005972e308396c9ef374c8f83beb",
+      "violation": {
+        "type": "stale_payment_contact",
+        "title": "Contact after payment",
+        "summary": "Payment was settled while the CRM still marked the invoice overdue.",
+        "at": "2026-09-05T18:00:00",
+        "source_label": "Payment system",
+        "source_value": "PAID",
+        "mirror_label": "CRM invoice",
+        "mirror_value": "OVERDUE",
+        "agent_belief": "OVERDUE",
+        "message": "Your payment remains overdue."
+      },
+      "violations": [
+        {
+          "type": "stale_payment_contact",
+          "title": "Contact after payment",
+          "summary": "Payment was settled while the CRM still marked the invoice overdue.",
+          "at": "2026-09-05T18:00:00",
+          "source_label": "Payment system",
+          "source_value": "PAID",
+          "mirror_label": "CRM invoice",
+          "mirror_value": "OVERDUE",
+          "agent_belief": "OVERDUE",
+          "message": "Your payment remains overdue."
+        },
+        {
+          "type": "active_dispute_contact",
+          "title": "Contact during an active dispute",
+          "summary": "A dispute was open while the CRM still considered the invoice collectible.",
+          "at": "2026-09-05T18:00:00",
+          "source_label": "Dispute service",
+          "source_value": "OPEN",
+          "mirror_label": "CRM dispute",
+          "mirror_value": "NONE",
+          "agent_belief": "COLLECTIBLE",
+          "message": "Your payment remains overdue."
+        }
+      ],
+      "failure_modes": [
+        "active_dispute_contact",
+        "stale_payment_contact"
+      ],
+      "boundaries": [
+        {
+          "failure_type": "active_dispute_contact",
+          "variable": "webhook_delay_minutes",
+          "label": "Dispute webhook lag",
+          "last_passing_minutes": 420,
+          "first_failing_minutes": 421,
+          "failure_begins_at": "7h 1m",
+          "resolution_minutes": 1
+        },
+        {
+          "failure_type": "stale_payment_contact",
+          "variable": "webhook_delay_minutes",
+          "label": "Payment webhook lag",
+          "last_passing_minutes": 540,
+          "first_failing_minutes": 541,
+          "failure_begins_at": "9h 1m",
+          "resolution_minutes": 1
+        }
+      ],
+      "counterfactual_proof": {
+        "verified": true,
+        "identical_fields": [
+          "environment_hash",
+          "event_hash",
+          "world_contract",
+          "world_asset_hash",
+          "invoice_id",
+          "initial_state_hash",
+          "fixture_hash",
+          "event_count"
+        ],
+        "differing_fields": [
+          "agent_policy"
+        ],
+        "only_change": {
+          "field": "agent_policy",
+          "original": "trust_crm_only",
+          "patched": "verify_payment_and_dispute_sources"
+        },
+        "original": {
+          "environment_hash": "47474863b4503f9d7a30ef007103a41f11ab82bbca1e477bef5361092af804c7",
+          "event_hash": "15f733e92992a1eb92060a2043b6ebd98117005972e308396c9ef374c8f83beb",
+          "world_contract": "collections-world-v2",
+          "world_asset_hash": "2f289fc37531993b3c1ccb1cc01415fb771bf6451ef4fc82a284687c3fc57576",
+          "invoice_id": "INV-1842",
+          "initial_state_hash": "d27cb2e8f72c4978c14a78e090b74ee5b33941e928118fd246af7af5b754db90",
+          "fixture_hash": "ea51c2292214b0ae9f09e801a8dd9fef04fd12f78a0a345fe7f14c732d52e40d",
+          "event_count": 7,
+          "agent_policy": "trust_crm_only"
+        },
+        "patched": {
+          "environment_hash": "47474863b4503f9d7a30ef007103a41f11ab82bbca1e477bef5361092af804c7",
+          "event_hash": "15f733e92992a1eb92060a2043b6ebd98117005972e308396c9ef374c8f83beb",
+          "world_contract": "collections-world-v2",
+          "world_asset_hash": "2f289fc37531993b3c1ccb1cc01415fb771bf6451ef4fc82a284687c3fc57576",
+          "invoice_id": "INV-1842",
+          "initial_state_hash": "d27cb2e8f72c4978c14a78e090b74ee5b33941e928118fd246af7af5b754db90",
+          "fixture_hash": "ea51c2292214b0ae9f09e801a8dd9fef04fd12f78a0a345fe7f14c732d52e40d",
+          "event_count": 7,
+          "agent_policy": "verify_payment_and_dispute_sources"
+        },
+        "runtime": {
+          "same_event_hash": true,
+          "same_environment_hash": true,
+          "fresh_isolation": true,
+          "original_sandbox_id": "ZGVza3RvcC1wb29sLWktMDgxOGI5YTg2ZDkyNjFhNmE6dm1fMDAwMDU4OmNtdGl3M2JxcjAwOXVucjAxa2xuYWx6eGE6MTc4ODMwMzE2NTk5MA.X-HAc-PQ7Enp9mkO36-5DOPv9x51vU0C-vOIl_dHQTY",
+          "patched_sandbox_id": "ZGVza3RvcC1wb29sLWktMDgxOGI5YTg2ZDkyNjFhNmE6dm1fMDAwMDYwOmNtdGl3M2JxcjAwOXVucjAxa2xuYWx6eGE6MTc4ODMwMzIyMzQ2NA.b-EfeRvXt3fXgi3gSIegzY7k2trzdUXh_EppioRtPhw",
+          "original_browser_session_id": "ip-10-0-10-130:337a2b12-7aa9-49a7-907b-a04a12ef577b:cmtiw3bqr009unr01klnalzxa:1788303169457.sY-yqjIzbFRrjMql7H6lDw",
+          "patched_browser_session_id": "ip-10-0-11-229:57b5a5f9-f5b2-4601-a4fd-5a83b78aa1be:cmtiw3bqr009unr01klnalzxa:1788303227074.yYM8lo0RxwNo1YJ81aEkBw"
+        }
+      },
+      "events": [
+        {
+          "at": "2026-09-01T09:00:00",
+          "kind": "invoice_created",
+          "payload": {}
+        },
+        {
+          "at": "2026-09-05T09:00:00",
+          "kind": "customer_payment",
+          "payload": {
+            "webhook_delay_hours": 36.0
+          }
+        },
+        {
+          "at": "2026-09-05T11:00:00",
+          "kind": "dispute_opened",
+          "payload": {
+            "webhook_delay_minutes": 1440
+          }
+        },
+        {
+          "at": "2026-09-05T18:00:00",
+          "kind": "agent_wakeup",
+          "payload": {}
+        },
+        {
+          "at": "2026-09-06T11:00:00",
+          "kind": "dispute_webhook",
+          "payload": {}
+        },
+        {
+          "at": "2026-09-06T21:00:00",
+          "kind": "payment_webhook",
+          "payload": {}
+        },
+        {
+          "at": "2026-09-07T15:00:00",
+          "kind": "agent_wakeup",
+          "payload": {}
+        }
+      ],
+      "search": {
+        "parent_future_id": null,
+        "mutation": "seed",
+        "novel_features": [
+          "failure:active_dispute_contact",
+          "outcome-signature:active_dispute_contact+stale_payment_contact",
+          "pair:customer_payment>dispute_opened",
+          "pair:dispute_webhook>payment_webhook",
+          "pair:invoice_created>customer_payment",
+          "pair:payment_webhook>agent_wakeup",
+          "payment-delay:long"
+        ],
+        "shared_prefix_events": 1
+      },
+      "observed": {
+        "payment": "PAID",
+        "crm": "PAID",
+        "dispute": "OPEN",
+        "crm_dispute": "OPEN",
+        "messages": "Your payment remains overdue.",
+        "message_count": 1,
+        "trace": [
+          {
+            "action": "pay",
+            "payment": "paid",
+            "crm": "overdue",
+            "dispute": "none",
+            "crm_dispute": "none",
+            "webhook_scheduled": true,
+            "dispute_webhook_scheduled": false,
+            "at": "2026-09-05T09:00:00"
+          },
+          {
+            "action": "dispute",
+            "payment": "paid",
+            "crm": "overdue",
+            "dispute": "open",
+            "crm_dispute": "none",
+            "webhook_scheduled": true,
+            "dispute_webhook_scheduled": true,
+            "at": "2026-09-05T11:00:00"
+          },
+          {
+            "action": "agent/original",
+            "payment": "paid",
+            "crm": "overdue",
+            "dispute": "open",
+            "crm_dispute": "none",
+            "webhook_scheduled": true,
+            "dispute_webhook_scheduled": true,
+            "sent": true,
+            "at": "2026-09-05T18:00:00"
+          },
+          {
+            "action": "dispute-webhook",
+            "payment": "paid",
+            "crm": "overdue",
+            "dispute": "open",
+            "crm_dispute": "open",
+            "webhook_scheduled": true,
+            "dispute_webhook_scheduled": true,
+            "at": "2026-09-06T11:00:00"
+          },
+          {
+            "action": "webhook",
+            "payment": "paid",
+            "crm": "paid",
+            "dispute": "open",
+            "crm_dispute": "open",
+            "webhook_scheduled": true,
+            "dispute_webhook_scheduled": true,
+            "at": "2026-09-06T21:00:00"
+          },
+          {
+            "action": "agent/original",
+            "payment": "paid",
+            "crm": "paid",
+            "dispute": "open",
+            "crm_dispute": "open",
+            "webhook_scheduled": true,
+            "dispute_webhook_scheduled": true,
+            "sent": false,
+            "at": "2026-09-07T15:00:00"
+          }
+        ]
+      },
+      "recording_keyframes": [
+        {
+          "action": "pay",
+          "payment": "paid",
+          "crm": "overdue",
+          "dispute": "none",
+          "crm_dispute": "none",
+          "webhook_scheduled": true,
+          "dispute_webhook_scheduled": false,
+          "at": "2026-09-05T09:00:00"
+        },
+        {
+          "action": "dispute",
+          "payment": "paid",
+          "crm": "overdue",
+          "dispute": "open",
+          "crm_dispute": "none",
+          "webhook_scheduled": true,
+          "dispute_webhook_scheduled": true,
+          "at": "2026-09-05T11:00:00"
+        },
+        {
+          "action": "agent/original",
+          "payment": "paid",
+          "crm": "overdue",
+          "dispute": "open",
+          "crm_dispute": "none",
+          "webhook_scheduled": true,
+          "dispute_webhook_scheduled": true,
+          "sent": true,
+          "at": "2026-09-05T18:00:00"
+        },
+        {
+          "action": "dispute-webhook",
+          "payment": "paid",
+          "crm": "overdue",
+          "dispute": "open",
+          "crm_dispute": "open",
+          "webhook_scheduled": true,
+          "dispute_webhook_scheduled": true,
+          "at": "2026-09-06T11:00:00"
+        },
+        {
+          "action": "webhook",
+          "payment": "paid",
+          "crm": "paid",
+          "dispute": "open",
+          "crm_dispute": "open",
+          "webhook_scheduled": true,
+          "dispute_webhook_scheduled": true,
+          "at": "2026-09-06T21:00:00"
+        },
+        {
+          "action": "agent/original",
+          "payment": "paid",
+          "crm": "paid",
+          "dispute": "open",
+          "crm_dispute": "open",
+          "webhook_scheduled": true,
+          "dispute_webhook_scheduled": true,
+          "sent": false,
+          "at": "2026-09-07T15:00:00"
+        }
+      ],
+      "browser_simulator_parity": {
+        "verified": true,
+        "trace_state_match": true,
+        "state_match": true,
+        "message_count_match": true,
+        "violation_match": true,
+        "simulator_failure_modes": [
+          "active_dispute_contact",
+          "stale_payment_contact"
+        ]
+      },
+      "recording_status": "downloaded",
+      "recording_path": "demo/replays/future-2-original.ndjson",
+      "recording_bytes": 40076,
+      "recording_events": 71,
+      "comparison": {
+        "original": "FAIL",
+        "patched": "PASS"
+      },
+      "patched_run": {
+        "agent": "fixed",
+        "status": "PASS",
+        "input_hash": "15f733e92992a1eb92060a2043b6ebd98117005972e308396c9ef374c8f83beb",
+        "sandbox_id": "ZGVza3RvcC1wb29sLWktMDgxOGI5YTg2ZDkyNjFhNmE6dm1fMDAwMDYwOmNtdGl3M2JxcjAwOXVucjAxa2xuYWx6eGE6MTc4ODMwMzIyMzQ2NA.b-EfeRvXt3fXgi3gSIegzY7k2trzdUXh_EppioRtPhw",
+        "browser_session_id": "ip-10-0-11-229:57b5a5f9-f5b2-4601-a4fd-5a83b78aa1be:cmtiw3bqr009unr01klnalzxa:1788303227074.yYM8lo0RxwNo1YJ81aEkBw",
+        "recording_path": "demo/replays/future-2-fixed.ndjson",
+        "recording_bytes": 39966,
+        "recording_events": 71,
+        "recording_status": "downloaded",
+        "recording_keyframes": [
+          {
+            "action": "pay",
+            "payment": "paid",
+            "crm": "overdue",
+            "dispute": "none",
+            "crm_dispute": "none",
+            "webhook_scheduled": true,
+            "dispute_webhook_scheduled": false,
+            "at": "2026-09-05T09:00:00"
+          },
+          {
+            "action": "dispute",
+            "payment": "paid",
+            "crm": "overdue",
+            "dispute": "open",
+            "crm_dispute": "none",
+            "webhook_scheduled": true,
+            "dispute_webhook_scheduled": true,
+            "at": "2026-09-05T11:00:00"
+          },
+          {
+            "action": "agent/fixed",
+            "payment": "paid",
+            "crm": "overdue",
+            "dispute": "open",
+            "crm_dispute": "none",
+            "webhook_scheduled": true,
+            "dispute_webhook_scheduled": true,
+            "sent": false,
+            "at": "2026-09-05T18:00:00"
+          },
+          {
+            "action": "dispute-webhook",
+            "payment": "paid",
+            "crm": "overdue",
+            "dispute": "open",
+            "crm_dispute": "open",
+            "webhook_scheduled": true,
+            "dispute_webhook_scheduled": true,
+            "at": "2026-09-06T11:00:00"
+          },
+          {
+            "action": "webhook",
+            "payment": "paid",
+            "crm": "paid",
+            "dispute": "open",
+            "crm_dispute": "open",
+            "webhook_scheduled": true,
+            "dispute_webhook_scheduled": true,
+            "at": "2026-09-06T21:00:00"
+          },
+          {
+            "action": "agent/fixed",
+            "payment": "paid",
+            "crm": "paid",
+            "dispute": "open",
+            "crm_dispute": "open",
+            "webhook_scheduled": true,
+            "dispute_webhook_scheduled": true,
+            "sent": false,
+            "at": "2026-09-07T15:00:00"
+          }
+        ],
+        "observed": {
+          "payment": "PAID",
+          "crm": "PAID",
+          "dispute": "OPEN",
+          "crm_dispute": "OPEN",
+          "messages": "No messages sent.",
+          "message_count": 0,
+          "trace": [
+            {
+              "action": "pay",
+              "payment": "paid",
+              "crm": "overdue",
+              "dispute": "none",
+              "crm_dispute": "none",
+              "webhook_scheduled": true,
+              "dispute_webhook_scheduled": false,
+              "at": "2026-09-05T09:00:00"
+            },
+            {
+              "action": "dispute",
+              "payment": "paid",
+              "crm": "overdue",
+              "dispute": "open",
+              "crm_dispute": "none",
+              "webhook_scheduled": true,
+              "dispute_webhook_scheduled": true,
+              "at": "2026-09-05T11:00:00"
+            },
+            {
+              "action": "agent/fixed",
+              "payment": "paid",
+              "crm": "overdue",
+              "dispute": "open",
+              "crm_dispute": "none",
+              "webhook_scheduled": true,
+              "dispute_webhook_scheduled": true,
+              "sent": false,
+              "at": "2026-09-05T18:00:00"
+            },
+            {
+              "action": "dispute-webhook",
+              "payment": "paid",
+              "crm": "overdue",
+              "dispute": "open",
+              "crm_dispute": "open",
+              "webhook_scheduled": true,
+              "dispute_webhook_scheduled": true,
+              "at": "2026-09-06T11:00:00"
+            },
+            {
+              "action": "webhook",
+              "payment": "paid",
+              "crm": "paid",
+              "dispute": "open",
+              "crm_dispute": "open",
+              "webhook_scheduled": true,
+              "dispute_webhook_scheduled": true,
+              "at": "2026-09-06T21:00:00"
+            },
+            {
+              "action": "agent/fixed",
+              "payment": "paid",
+              "crm": "paid",
+              "dispute": "open",
+              "crm_dispute": "open",
+              "webhook_scheduled": true,
+              "dispute_webhook_scheduled": true,
+              "sent": false,
+              "at": "2026-09-07T15:00:00"
+            }
+          ]
+        },
+        "browser_simulator_parity": {
+          "verified": true,
+          "trace_state_match": true,
+          "state_match": true,
+          "message_count_match": true,
+          "violation_match": true,
+          "simulator_failure_modes": []
+        }
+      }
+    }
+  ],
+  "summary": {
+    "explored": 3,
+    "failures": 2,
+    "failure_rate": 0.6667,
+    "failure_modes": {
+      "active_dispute_contact": 1,
+      "stale_payment_contact": 2
+    },
+    "patched_replays": 2,
+    "patched_passes": 2,
+    "virtual_days": 15.5,
+    "wall_clock_seconds": 141.8757,
+    "minimization_ratio": 0.4,
+    "environments_used": 5,
+    "coverage": {
+      "covered": 6,
+      "possible": 6,
+      "patterns": [
+        {
+          "id": "payment-window:before",
+          "label": "Wakeup before payment",
+          "futures": 2
+        },
+        {
+          "id": "payment-window:stale",
+          "label": "Wakeup in stale payment window",
+          "futures": 3
+        },
+        {
+          "id": "payment-window:after",
+          "label": "Wakeup after payment sync",
+          "futures": 2
+        },
+        {
+          "id": "dispute-window:before",
+          "label": "Wakeup before dispute",
+          "futures": 1
+        },
+        {
+          "id": "dispute-window:active",
+          "label": "Wakeup during active dispute",
+          "futures": 2
+        },
+        {
+          "id": "dispute-window:after",
+          "label": "Wakeup after dispute sync",
+          "futures": 2
+        }
+      ]
+    },
+    "search": {
+      "strategy": "coverage_guided_mutation",
+      "candidates_evaluated": 36,
+      "accepted_mutations": 0,
+      "features_discovered": 39
+    },
+    "recordings_downloaded": 5
+  }
+}
