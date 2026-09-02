@@ -101,8 +101,13 @@ export function ExecutionTrace({ future, isCloud }: { future?: Future; isCloud: 
         <div className="logic-panel">
           <div className="panel-head"><span>Execution path</span><small>Observable actions + evidence</small></div>
           <div className={`agent-evidence ${modelMode ? "model" : "deterministic"}`} aria-label="Agent evidence">
-            <strong>{modelMode ? `MODEL: ${modelEvidence?.active_model ?? modelEvidence?.requested_model ?? "openrouter"}` : "DETERMINISTIC"}</strong>
-            {modelMode ? <><span>temperature: {modelEvidence?.temperature ?? "—"}</span><span>prompt hash: {shortHash(firstDecision?.prompt_hash)}</span><em>stochastic</em></> : <span>{future.agent_evidence?.policy ?? "built-in policy"}</span>}
+            <div className="agent-evidence-copy">
+              <span>Agent mode</span>
+              <strong>{modelMode ? `MODEL: ${modelEvidence?.active_model ?? modelEvidence?.requested_model ?? "OpenRouter"}` : "DETERMINISTIC"}</strong>
+            </div>
+            <div className="agent-evidence-meta">
+              {modelMode ? <><span>Temperature {modelEvidence?.temperature ?? "—"}</span><span>Prompt <code>{shortHash(firstDecision?.prompt_hash)}</code></span><em>stochastic</em></> : <span>{future.agent_evidence?.policy?.replaceAll("_", " ") ?? "built-in policy"}</span>}
+            </div>
           </div>
           <ol className="execution-steps">
             {steps.map((step, index) => (

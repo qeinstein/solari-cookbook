@@ -80,21 +80,24 @@ export default function Dashboard() {
         <div className="brand"><div className="mark">TC</div><div className="brand-name">TimeCapsule</div></div>
         <div className="overline">Workspace</div>
         <nav className="nav">
-          <a className="active" href="#future-tree"><span className="nav-icon">◌</span>Future tree</a>
-          <a href="#replay"><span className="nav-icon">▷</span>Replay</a>
-          <a href="#evidence"><span className="nav-icon">⌁</span>Evidence</a>
-          <a href="#coverage"><span className="nav-icon">◇</span>Coverage</a>
+          <a className="active" href="#future-tree"><span className="nav-icon">01</span>Future tree</a>
+          <a href="#replay"><span className="nav-icon">02</span>Replay theatre</a>
+          <a href="#evidence"><span className="nav-icon">03</span>Evidence</a>
+          <a href="#coverage"><span className="nav-icon">04</span>Coverage</a>
         </nav>
-        <div className="side-bottom"><div className="overline">Execution</div><p>{isModel ? "OpenRouter model agent" : isSolari ? "Solari cloud isolation" : "Deterministic local proof"}</p><p>Coverage-guided mutation</p></div>
+        <div className="side-bottom">
+          <div className="overline">Execution mode</div>
+          <div className="execution-context"><span aria-hidden="true" /><strong>{isModel ? "OpenRouter model" : isSolari ? "Solari isolation" : "Local proof"}</strong></div>
+          <p>Coverage-guided temporal search</p>
+        </div>
       </aside>
 
       <div className="content">
         <div className="topbar">
-          <div className="crumbs"><span>Projects</span><span aria-hidden="true">›</span><b>Collections agent</b></div>
+          <div className="crumbs"><span>TimeCapsule</span><span aria-hidden="true">/</span><b>Collections reliability</b></div>
           <div className="top-actions">
             <span className={`mode-badge ${isSolari ? "cloud" : ""}`}><span aria-hidden="true" />{isSolari ? "Solari run" : "Local proof"}</span>
-            <a className="docs-link" href="https://github.com/qeinstein/solari-cookbook/tree/main/examples/timecapsule-py" target="_blank" rel="noreferrer">Documentation</a>
-            <div className="avatar" aria-label="Workspace owner">Q</div>
+            <a className="docs-link" href="https://github.com/qeinstein/solari-cookbook/tree/main/examples/timecapsule-py" target="_blank" rel="noreferrer">Docs <span aria-hidden="true">↗</span></a>
           </div>
         </div>
 
