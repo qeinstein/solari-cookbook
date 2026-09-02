@@ -41,8 +41,8 @@ cd solari-cookbook/examples/timecapsule-py
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-python3 main.py run --futures 25
-python3 dashboard/dev.py
+npm ci --prefix dashboard
+python3 dashboard/dev.py --run demo/solari-canonical.json
 ```
 
 Open [http://127.0.0.1:3000](http://127.0.0.1:3000), then:
@@ -159,6 +159,11 @@ hit rate, but this run does not prove that it finds rare failures faster.
 See the full [search comparison report](benchmarks/timecapsule-search-comparison.md)
 for the protocol, distributions, and limitations.
 
+The checked-in [canonical cloud run](examples/timecapsule-py/demo/solari-canonical.json)
+contains a safe branch, payment-staleness and dispute-contact failures, two
+patched passes, and five recorded browser replays. It opens without a cloud key
+so the complete evidence path is immediately reviewable from a fresh clone.
+
 ## Optional cloud execution
 
 Local proof and deterministic tests work without an account or API key. Keep
@@ -168,6 +173,7 @@ the credential server-side and never commit it or expose it to the browser:
 cd examples/timecapsule-py
 source .venv/bin/activate
 export TIMECAPSULE_CLOUD_KEY=your_key_here
+npm ci --prefix dashboard
 python3 main.py cloud --futures 3 --concurrency 1 --max-environments 6 --output runs/cloud-latest.json
 python3 dashboard/dev.py --run runs/cloud-latest.json
 ```
@@ -190,6 +196,7 @@ recording behavior, and the honest production boundary.
 ├── examples/timecapsule-py/
 │   ├── assets/             # Product banner and static visual assets
 │   ├── dashboard/          # Next.js App Router frontend + Python API
+│   ├── demo/               # Canonical recorded cloud run and replays
 │   ├── regressions/        # Minimized, checked-in failure futures
 │   ├── timecapsule/        # Deterministic engine and execution adapters
 │   ├── world/              # Browser-drivable temporal world

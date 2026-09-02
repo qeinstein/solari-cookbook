@@ -246,6 +246,8 @@ class ProductLoopTests(unittest.TestCase):
             self.assertIn("current implementation demonstrates", text)
             self.assertIn("built-in original", text)
             self.assertIn("not an arbitrary-agent runner", text)
+            self.assertIn("npm ci --prefix dashboard", text)
+            self.assertIn("demo/solari-canonical.json", text)
             self.assertNotIn("your ai agent fails", text)
             self.assertNotIn("any agent", text)
             self.assertNotIn("before deploying your agents", text)
@@ -254,6 +256,25 @@ class ProductLoopTests(unittest.TestCase):
         inspector = (EXAMPLE_ROOT / "dashboard/components/Inspector.tsx").read_text()
         self.assertIn("built-in original and patched policies", dashboard)
         self.assertIn("Only the built-in policy changes", inspector)
+
+    def test_canonical_demo_contains_recorded_failure_evidence(self):
+        path = EXAMPLE_ROOT / "demo/solari-canonical.json"
+        data = json.loads(path.read_text())
+        self.assertEqual(data["execution_mode"], "solari")
+        self.assertEqual([future["status"] for future in data["futures"]], ["PASS", "FAIL", "FAIL"])
+        self.assertIn("stale_payment_contact", data["futures"][1]["failure_modes"])
+        self.assertIn("active_dispute_contact", data["futures"][2]["failure_modes"])
+        self.assertEqual(data["summary"]["patched_passes"], 2)
+        recordings = []
+        for future in data["futures"]:
+            sources = [future, future.get("patched_run", {})]
+            for source in sources:
+                recording_path = source.get("recording_path")
+                if recording_path:
+                    recording = EXAMPLE_ROOT / recording_path
+                    self.assertTrue(recording.is_file(), recording)
+                    recordings.append(recording)
+        self.assertEqual(len(recordings), 5)
 
     def test_local_run_persists_patch_outcomes(self):
         with tempfile.TemporaryDirectory() as directory:

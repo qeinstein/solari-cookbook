@@ -51,8 +51,8 @@ cd examples/timecapsule-py
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-python3 main.py run --futures 25
-python3 dashboard/dev.py
+npm ci --prefix dashboard
+python3 dashboard/dev.py --run demo/solari-canonical.json
 ```
 
 Open [http://127.0.0.1:3000](http://127.0.0.1:3000), then:
@@ -72,6 +72,11 @@ input and causal state visible rather than implied.
 
 The **Replay theatre** keeps the observable policy path beside the browser
 state, so the run can be understood at a glance or screen-recorded for a demo.
+
+The checked-in [canonical cloud run](demo/solari-canonical.json) contains a
+safe branch, payment-staleness and dispute-contact failures, two patched passes,
+and five recorded browser replays. It is the recommended first run for a fresh
+clone and does not require a cloud key.
 
 ## The scenario
 
@@ -265,6 +270,7 @@ expose it to the browser:
 cd examples/timecapsule-py
 source .venv/bin/activate
 export TIMECAPSULE_CLOUD_KEY=your_key_here
+npm ci --prefix dashboard
 python3 main.py cloud --futures 3 --concurrency 1 --max-environments 6 --output runs/cloud-latest.json
 python3 dashboard/dev.py --run runs/cloud-latest.json
 ```
@@ -346,6 +352,7 @@ deterministic engine, not remote browser isolation or recording availability.
 timecapsule-py/
 ├── assets/                 # Product banner and static visual assets
 ├── dashboard/              # Next.js App Router frontend + Python API
+├── demo/                   # Canonical recorded cloud run and replays
 ├── regressions/            # Minimized, checked-in failure futures
 ├── timecapsule/            # Deterministic world and package CLI
 ├── world/                  # Browser-drivable temporal world
