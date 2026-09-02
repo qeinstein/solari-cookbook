@@ -79,6 +79,13 @@ def local_future_entry(future: SearchFuture) -> dict[str, Any]:
         "future_id": future.future_id,
         "seed": future.seed,
         "agent": "original",
+        "agent_mode": "policy",
+        "agent_evidence": {
+            "mode": "policy",
+            "label": "DETERMINISTIC",
+            "policy": "trust_crm_only",
+            "stochastic": False,
+        },
         "status": "PASS" if invariant_holds(world) else "FAIL",
         "invariant": INVARIANT_ID,
         "input_hash": future_fingerprint(future.events),

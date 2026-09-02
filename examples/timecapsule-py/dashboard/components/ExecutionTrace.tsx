@@ -7,6 +7,8 @@ function actionLabel(value: unknown) {
   const action = String(value ?? "");
   if (action === "agent/original") return "Original policy wakeup";
   if (action === "agent/fixed") return "Patched policy wakeup";
+  if (action === "agent/model/send") return "Model sends reminder";
+  if (action === "agent/model/suppress") return "Model suppresses contact";
   if (action === "pay") return "Customer payment";
   if (action === "webhook") return "Payment webhook";
   if (action === "dispute") return "Dispute opened";
@@ -51,7 +53,10 @@ export function ExecutionTrace({ future, isCloud }: { future?: Future; isCloud: 
       ? "Invariant violated"
       : "Invariant held";
   const actionCount = future.events.filter((event) => event.kind !== "invoice_created").length;
-  const policy = future.agent === "fixed" ? "patched" : "original";
+  const modelMode = future.agent_mode === "model" || future.agent_evidence?.mode === "model";
+  const policy = future.agent === "fixed" || future.agent === "model_patched" ? "patched" : modelMode ? "model" : "original";
+  const modelEvidence = future.agent_evidence?.mode === "model" ? future.agent_evidence : undefined;
+  const firstDecision = modelEvidence?.decisions?.[0];
   const hasParity = future.browser_simulator_parity?.verified;
   const steps = [
     {
@@ -95,6 +100,10 @@ export function ExecutionTrace({ future, isCloud }: { future?: Future; isCloud: 
       <div className="replay-grid">
         <div className="logic-panel">
           <div className="panel-head"><span>Execution path</span><small>Observable actions + evidence</small></div>
+          <div className={`agent-evidence ${modelMode ? "model" : "deterministic"}`} aria-label="Agent evidence">
+            <strong>{modelMode ? `MODEL: ${modelEvidence?.active_model ?? modelEvidence?.requested_model ?? "openrouter"}` : "DETERMINISTIC"}</strong>
+            {modelMode ? <><span>temperature: {modelEvidence?.temperature ?? "—"}</span><span>prompt hash: {shortHash(firstDecision?.prompt_hash)}</span><em>stochastic</em></> : <span>{future.agent_evidence?.policy ?? "built-in policy"}</span>}
+          </div>
           <ol className="execution-steps">
             {steps.map((step, index) => (
               <li className={`execution-step ${step.state}`} key={step.title} style={{ animationDelay: `${index * 70}ms` }}>
@@ -128,7 +137,7 @@ export function ExecutionTrace({ future, isCloud }: { future?: Future; isCloud: 
             <div className="browser-action">
               <span className={`browser-action-icon ${future.status.toLowerCase()}`} aria-hidden="true">{future.status === "ERROR" ? "!" : "↗"}</span>
               <div><strong>{actionLabel(lastActionValue)}</strong><small>{lastActionAt ? formatMoment(String(lastActionAt)) : `${messageCount} message${messageCount === 1 ? "" : "s"} observed`}</small></div>
-              <span className="browser-action-label">{policy} policy</span>
+              <span className="browser-action-label">{modelMode ? "model action" : `${policy} policy`}</span>
             </div>
             <div className="browser-trace-strip" aria-label="Observed browser actions">
               {(trace.length ? trace.slice(-4) : future.events.slice(-4)).map((item, index) => {

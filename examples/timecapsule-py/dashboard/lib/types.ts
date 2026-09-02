@@ -84,10 +84,46 @@ export type BrowserSimulatorParity = {
   message_count_match?: boolean;
   violation_match?: boolean;
   simulator_failure_modes?: string[];
+  model_action_match?: boolean;
+  exact_behavior_reproducible?: boolean;
+};
+
+export type ModelDecision = {
+  at?: string;
+  action: "send_reminder" | "suppress";
+  route?: "send" | "suppress";
+  rationale?: string;
+  provider?: "openrouter";
+  model?: string;
+  requested_model?: string;
+  temperature?: number;
+  stochastic?: boolean;
+  prompt_hash?: string;
+  observation_hash?: string;
+  future_fingerprint?: string;
+  environment_fingerprint?: string;
+  model_response?: Record<string, unknown>;
+  request_id?: string;
+  fallback_from?: string | null;
+};
+
+export type AgentEvidence = {
+  mode: "policy" | "model";
+  label?: "DETERMINISTIC";
+  policy?: string;
+  provider?: "openrouter";
+  requested_model?: string;
+  active_model?: string;
+  temperature?: number | null;
+  stochastic?: boolean;
+  decisions?: ModelDecision[];
 };
 
 export type PatchedRun = {
   agent?: string;
+  agent_mode?: "policy" | "model";
+  agent_evidence?: AgentEvidence;
+  exact_behavior_reproducible?: boolean;
   status?: FutureStatus;
   input_hash?: string;
   sandbox_id?: string;
@@ -107,6 +143,9 @@ export type Future = {
   seed: number;
   status: FutureStatus;
   agent?: string;
+  agent_mode?: "policy" | "model";
+  agent_evidence?: AgentEvidence;
+  exact_behavior_reproducible?: boolean;
   invariant?: string;
   input_hash?: string;
   violation?: ViolationSnapshot | null;
@@ -184,6 +223,7 @@ export type RunData = {
   run_id?: string;
   execution_mode?: "local" | "solari";
   started_at?: string;
+  agent_config?: AgentEvidence;
   futures: Future[];
   summary?: RunSummary;
 };

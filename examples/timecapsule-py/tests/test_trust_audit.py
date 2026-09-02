@@ -24,6 +24,7 @@ from timecapsule.core import (
 )
 from timecapsule.evidence import counterfactual_proof
 from timecapsule.evidence import environment_manifest
+from timecapsule.models import FREE_MODEL_IDS
 from timecapsule.runner import local_future_entry
 from timecapsule.search import Scenario, coverage_guided_search, find_failure_boundaries, _with_webhook_delay
 from timecapsule.search import SearchResult
@@ -253,6 +254,42 @@ class BrowserParityAuditTests(unittest.TestCase):
                         fixed=fixed,
                     )
 
+    def test_browser_world_accepts_model_action_trace(self):
+        events = Scenario(1, 720, (540,), 120, 1440).events()
+        self.request("/reset", "POST")
+        for event in events:
+            if event.kind == "invoice_created":
+                continue
+            action = (
+                "agent/model/suppress"
+                if event.kind == "agent_wakeup"
+                else EVENT_ACTIONS[event.kind]
+            )
+            self.request(f"/{action}", "POST")
+        state = self.request("/state")
+        trace = timestamp_observed_trace(
+            state["trace"],
+            events,
+            agent_mode="model",
+            model_actions=["suppress"],
+        )
+        parity = browser_simulator_parity(
+            {
+                "payment": state["payment"],
+                "crm": state["crm"],
+                "dispute": state["dispute"],
+                "crm_dispute": state["crm_dispute"],
+                "messages": "\n".join(state["messages"]) if state["messages"] else "No messages sent.",
+            },
+            trace,
+            events,
+            agent_mode="model",
+            model_decisions=[{"action": "suppress"}],
+        )
+        self.assertIn("agent/model/suppress", [item["action"] for item in trace])
+        self.assertTrue(parity["verified"])
+        self.assertFalse(parity["exact_behavior_reproducible"])
+
 
 class SolariCleanupAuditTests(unittest.IsolatedAsyncioTestCase):
     async def test_sandbox_is_killed_when_remote_setup_fails(self):
@@ -386,6 +423,56 @@ class SolariFailureSemanticsTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(payload["summary"]["completion_status"], "COMPLETE_WITH_ERRORS")
             self.assertEqual(payload["summary"]["errors"], 1)
             self.assertTrue(output.exists())
+
+    async def test_model_run_persists_openrouter_config_and_stochastic_evidence(self):
+        future = coverage_guided_search(1, 5).futures[0]
+
+        async def fake_future(candidate, fixed=False, recording_dir=None, **kwargs):
+            result = self.remote_result(candidate, "PASS" if fixed else "FAIL", fixed=fixed)
+            result.update({
+                "agent": "model_patched" if fixed else "model",
+                "agent_mode": "model",
+                "agent_evidence": {
+                    "mode": "model",
+                    "provider": "openrouter",
+                    "requested_model": FREE_MODEL_IDS[0],
+                    "active_model": FREE_MODEL_IDS[0],
+                    "temperature": 0.2,
+                    "stochastic": True,
+                    "decisions": [{
+                        "action": "suppress" if fixed else "send_reminder",
+                        "prompt_hash": "p" * 64,
+                        "observation_hash": "o" * 64,
+                        "future_fingerprint": future_fingerprint(candidate.events),
+                        "environment_fingerprint": "e" * 64,
+                        "model_response": {"action": "suppress" if fixed else "send_reminder"},
+                    }],
+                },
+                "exact_behavior_reproducible": False,
+            })
+            return result
+
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "model.json"
+            with patch("timecapsule.solari_runner.cloud_api_key", return_value="test-only"), \
+                    patch("timecapsule.solari_runner.openrouter_api_key", return_value="test-only"), \
+                    patch("timecapsule.solari_runner.coverage_guided_search", return_value=self.search_result([future])), \
+                    patch("timecapsule.solari_runner.solari_future", side_effect=fake_future):
+                payload = await solari_run(
+                    1,
+                    5,
+                    output,
+                    max_environments=2,
+                    agent_mode="model",
+                    model=FREE_MODEL_IDS[0],
+                )
+
+            self.assertEqual(payload["agent_config"]["mode"], "model")
+            self.assertEqual(payload["agent_config"]["provider"], "openrouter")
+            self.assertTrue(payload["agent_config"]["stochastic"])
+            self.assertFalse(payload["futures"][0]["exact_behavior_reproducible"])
+            self.assertEqual(payload["futures"][0]["patched_run"]["agent_mode"], "model")
+            self.assertEqual(payload["futures"][0]["comparison"], {"original": "FAIL", "patched": "PASS"})
 
     async def test_environment_budget_rejects_before_search_or_provisioning(self):
         with patch("timecapsule.solari_runner.cloud_api_key") as key, \

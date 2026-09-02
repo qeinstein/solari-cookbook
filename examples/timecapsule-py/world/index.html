@@ -27,3 +27,14 @@
   new MutationObserver(syncMessageCount).observe(messages, { childList: true, characterData: true, subtree: true });
   syncMessageCount();
 </script>
+<script>
+  const modelGroup = document.createElement('div');
+  modelGroup.className = 'control-group';
+  modelGroup.innerHTML = '<span class="control-label">Model action · host-selected</span><div class="buttons"><button data-action="agent/model/send">Model: send reminder</button><button data-action="agent/model/suppress">Model: suppress contact</button></div>';
+  document.querySelector('.controls').append(modelGroup);
+  modelGroup.querySelectorAll('button').forEach(button => {
+    button.onclick = () => {
+      actionQueue = actionQueue.then(() => runAction(button.dataset.action)).catch(() => refresh());
+    };
+  });
+</script>

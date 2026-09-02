@@ -61,6 +61,23 @@ def parser():
     cloud.add_argument("--seed", type=int, default=0)
     cloud.add_argument("--concurrency", type=int, default=1)
     cloud.add_argument("--max-environments", type=int, default=20)
+    cloud.add_argument(
+        "--agent",
+        choices=("policy", "model"),
+        default="policy",
+        help="deterministic built-in policy (default) or an OpenRouter model agent",
+    )
+    cloud.add_argument(
+        "--model",
+        metavar="MODEL_ID",
+        help="OpenRouter model ID; omit in a terminal to choose from the curated list",
+    )
+    cloud.add_argument("--temperature", type=float, default=0.2)
+    cloud.add_argument(
+        "--allow-untested-model",
+        action="store_true",
+        help="allow an OpenRouter model ID outside the curated tested list",
+    )
     cloud.add_argument("--output", type=Path, default=Path("runs/cloud-latest.json"))
     benchmark = commands.add_parser("benchmark", help="matched random vs coverage-guided search benchmark")
     benchmark.add_argument("--trials", type=int, default=200)
@@ -86,6 +103,10 @@ def main():
             args.output,
             args.concurrency,
             args.max_environments,
+            args.agent,
+            args.model,
+            args.temperature,
+            args.allow_untested_model,
         ))
     elif args.mode == "benchmark":
         report = run_benchmark(args.trials, args.budget, args.seed)

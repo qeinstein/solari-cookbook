@@ -8,6 +8,7 @@ import json
 import os
 from pathlib import Path
 from time import perf_counter
+from typing import Any
 
 from .core import (
     INVARIANT_ID,
@@ -21,11 +22,15 @@ from .core import (
     observed_violations,
 )
 from .evidence import counterfactual_proof
+from .agents import OpenRouterAgent
+from .models import openrouter_api_key, select_model
+from .openrouter import OpenRouterRouter
 from .runner import build_summary
 from .search import SearchFuture, coverage_guided_search, find_failure_boundaries
 
 
 ROOT = Path(__file__).parents[1]
+_PROMPTED_CLOUD_KEY: str | None = None
 EVENT_ACTIONS = {
     "customer_payment": "pay",
     "payment_webhook": "webhook",
@@ -35,27 +40,54 @@ EVENT_ACTIONS = {
 
 
 def cloud_api_key():
+    global _PROMPTED_CLOUD_KEY
     key = os.environ.get("TIMECAPSULE_CLOUD_KEY") or os.environ.get("SOLARI_API_KEY")
     if not key:
-        raise SystemExit("TIMECAPSULE_CLOUD_KEY is required for cloud mode")
+        if _PROMPTED_CLOUD_KEY:
+            return _PROMPTED_CLOUD_KEY
+        if not os.isatty(0):
+            raise SystemExit(
+                "Solari API key not detected. Set TIMECAPSULE_CLOUD_KEY or SOLARI_API_KEY, "
+                "or run cloud mode from a terminal."
+            )
+        try:
+            import getpass
+            key = getpass.getpass("Solari API key not detected. Enter API key: ").strip()
+        except EOFError as error:
+            raise SystemExit("No Solari API key entered.") from error
+        if not key:
+            raise SystemExit("No Solari API key entered.")
+        _PROMPTED_CLOUD_KEY = key
     return key
 
 
 def _safe_error_message(error: Exception) -> str:
     message = str(error).strip() or error.__class__.__name__
-    for variable in ("TIMECAPSULE_CLOUD_KEY", "SOLARI_API_KEY"):
+    for variable in ("TIMECAPSULE_CLOUD_KEY", "SOLARI_API_KEY", "OPENROUTER_API_KEY"):
         secret = os.environ.get(variable)
         if secret:
             message = message.replace(secret, "[redacted]")
     return message[:500]
 
 
-def cloud_error_result(future: SearchFuture, fixed: bool, error: Exception):
-    return {
+def cloud_error_result(
+    future: SearchFuture,
+    fixed: bool,
+    error: Exception,
+    agent_mode: str = "policy",
+    model: str | None = None,
+    temperature: float | None = None,
+):
+    result = {
         "future_id": future.future_id,
         "seed": future.seed,
         "status": "ERROR",
-        "agent": "fixed" if fixed else "original",
+        "agent": (
+            "model_patched" if agent_mode == "model" and fixed
+            else "model" if agent_mode == "model"
+            else "fixed" if fixed else "original"
+        ),
+        "agent_mode": agent_mode,
         "invariant": INVARIANT_ID,
         "input_hash": future_fingerprint(future.events),
         "events": [event.as_dict() for event in future.events],
@@ -71,6 +103,16 @@ def cloud_error_result(future: SearchFuture, fixed: bool, error: Exception):
             "shared_prefix_events": future.shared_prefix_events,
         },
     }
+    if model:
+        result["agent_evidence"] = {
+            "mode": "model",
+            "provider": "openrouter",
+            "requested_model": model,
+            "temperature": temperature,
+            "stochastic": True,
+            "decisions": [],
+        }
+    return result
 
 
 async def goto_preview(page, preview_url: str):
@@ -100,13 +142,48 @@ async def read_world_trace(page):
     return json.loads(await page.locator("#trace").inner_text())
 
 
-def timestamp_observed_trace(trace, events, fixed=False):
+async def read_world_observation(page, event: Any):
+    trace = await read_world_trace(page)
+    return {
+        "at": event.at.isoformat(),
+        "event": event.kind,
+        "payment": (await page.locator("#payment").inner_text()).lower(),
+        "crm": (await page.locator("#crm").inner_text()).lower(),
+        "dispute": (await page.locator("#dispute").inner_text()).lower(),
+        "crm_dispute": (await page.locator("#crm-dispute").inner_text()).lower(),
+        "messages": await page.locator("#messages").inner_text(),
+        "webhook_scheduled": any(item.get("action") == "pay" for item in trace),
+        "dispute_webhook_scheduled": any(item.get("action") == "dispute" for item in trace),
+    }
+
+
+def timestamp_observed_trace(
+    trace,
+    events,
+    fixed=False,
+    agent_mode="policy",
+    model_actions=None,
+):
     agent_action = f"agent/{'fixed' if fixed else 'original'}"
-    expected = [
-        (event, agent_action if event.kind == "agent_wakeup" else EVENT_ACTIONS[event.kind])
-        for event in sorted(events, key=event_sort_key)
-        if event.kind != "invoice_created"
-    ]
+    model_actions = list(model_actions or [])
+    model_index = 0
+    expected = []
+    for event in sorted(events, key=event_sort_key):
+        if event.kind == "invoice_created":
+            continue
+        if event.kind == "agent_wakeup":
+            if agent_mode == "model":
+                if model_index >= len(model_actions):
+                    raise RuntimeError("model action evidence is missing for an agent wakeup")
+                expected_action = f"agent/model/{model_actions[model_index]}"
+                model_index += 1
+            else:
+                expected_action = agent_action
+        else:
+            expected_action = EVENT_ACTIONS[event.kind]
+        expected.append((event, expected_action))
+    if agent_mode == "model" and model_index != len(model_actions):
+        raise RuntimeError("model action evidence contains an extra decision")
     if len(trace) != len(expected):
         raise RuntimeError(f"observed {len(trace)} actions for {len(expected)} temporal events")
     timestamped = []
@@ -134,8 +211,16 @@ def timestamp_observed_trace(trace, events, fixed=False):
     return timestamped
 
 
-def browser_simulator_parity(observed, trace, events, fixed=False):
+def browser_simulator_parity(
+    observed,
+    trace,
+    events,
+    fixed=False,
+    agent_mode="policy",
+    model_decisions=None,
+):
     simulated = execute(events, fixed=fixed)
+    model_decisions = list(model_decisions or [])
     ordered_events = [
         event for event in sorted(events, key=event_sort_key)
         if event.kind != "invoice_created"
@@ -145,6 +230,8 @@ def browser_simulator_parity(observed, trace, events, fixed=False):
             f"observed {len(trace)} trace states for {len(ordered_events)} temporal events"
         )
     previous_message_count = 0
+    model_index = 0
+    expected_model_messages = 0
     for index, (item, event) in enumerate(zip(trace, ordered_events)):
         prefix = execute(
             [
@@ -185,10 +272,19 @@ def browser_simulator_parity(observed, trace, events, fixed=False):
             raise RuntimeError(f"dispute scheduling mismatch after {event.kind}")
         if event.kind == "agent_wakeup":
             actual_sent = bool(item.get("sent"))
-            expected_sent = len(prefix.messages) > previous_message_count
+            if agent_mode == "model":
+                if model_index >= len(model_decisions):
+                    raise RuntimeError("model decision evidence is missing for an agent wakeup")
+                expected_sent = model_decisions[model_index]["action"] == "send_reminder"
+                expected_model_messages += expected_sent
+                model_index += 1
+            else:
+                expected_sent = len(prefix.messages) > previous_message_count
             if actual_sent != expected_sent:
                 raise RuntimeError(f"agent send mismatch after {event.kind}")
         previous_message_count = len(prefix.messages)
+    if agent_mode == "model" and model_index != len(model_decisions):
+        raise RuntimeError("model decision evidence contains an extra action")
     browser_state = (
         observed["payment"].lower(),
         observed["crm"].lower(),
@@ -208,21 +304,27 @@ def browser_simulator_parity(observed, trace, events, fixed=False):
     observed_modes = sorted({item["type"] for item in observed_violations(trace)})
     if browser_state != simulator_state:
         raise RuntimeError(f"browser/simulator state mismatch: {browser_state} != {simulator_state}")
-    if browser_message_count != len(simulated.messages):
+    expected_message_count = (
+        expected_model_messages if agent_mode == "model" else len(simulated.messages)
+    )
+    if browser_message_count != expected_message_count:
         raise RuntimeError(
-            f"browser/simulator message mismatch: {browser_message_count} != {len(simulated.messages)}"
+            f"browser/agent message mismatch: {browser_message_count} != {expected_message_count}"
         )
     if observed_modes != simulator_modes:
-        raise RuntimeError(f"browser/simulator violation mismatch: {observed_modes} != {simulator_modes}")
-    if observed_invariant_holds(trace) != invariant_holds(simulated):
+        if agent_mode != "model":
+            raise RuntimeError(f"browser/simulator violation mismatch: {observed_modes} != {simulator_modes}")
+    if agent_mode != "model" and observed_invariant_holds(trace) != invariant_holds(simulated):
         raise RuntimeError("browser/simulator invariant result mismatch")
     return {
         "verified": True,
         "trace_state_match": True,
         "state_match": True,
         "message_count_match": True,
-        "violation_match": True,
-        "simulator_failure_modes": simulator_modes,
+        "violation_match": agent_mode == "model" or observed_modes == simulator_modes,
+        "simulator_failure_modes": observed_modes if agent_mode == "model" else simulator_modes,
+        "model_action_match": agent_mode == "model",
+        "exact_behavior_reproducible": agent_mode != "model",
     }
 
 
@@ -230,12 +332,23 @@ async def solari_future(
     future: SearchFuture,
     fixed: bool = False,
     recording_dir: Path | None = None,
+    api_key: str | None = None,
+    agent_mode: str = "policy",
+    model_router: OpenRouterRouter | None = None,
 ):
     from solari_browser import Solari
     from solari_browser.errors import SolariError
     from solari_sandbox import SandboxClient
 
-    api_key = cloud_api_key()
+    api_key = api_key or cloud_api_key()
+    if agent_mode not in {"policy", "model"}:
+        raise ValueError(f"unknown agent mode: {agent_mode}")
+    if agent_mode == "model" and model_router is None:
+        raise ValueError("model mode requires an OpenRouter router")
+    model_agent = OpenRouterAgent(model_router, fixed=fixed) if model_router else None
+    model_decisions: list[dict[str, Any]] = []
+    proof = counterfactual_proof(future.events)
+    future_hash = future_fingerprint(future.events)
     sandbox_client = SandboxClient(
         api_key=api_key,
         base_url="https://api.getsolari.com",
@@ -271,11 +384,21 @@ async def solari_future(
                     for event in future.events:
                         if event.kind == "invoice_created":
                             continue
-                        action = (
-                            f"agent/{'fixed' if fixed else 'original'}"
-                            if event.kind == "agent_wakeup"
-                            else EVENT_ACTIONS[event.kind]
-                        )
+                        if event.kind == "agent_wakeup" and model_agent:
+                            observation = await read_world_observation(page, event)
+                            decision = await model_agent.decide(
+                                observation,
+                                future_hash,
+                                proof["original"]["environment_hash"],
+                            )
+                            model_decisions.append(decision)
+                            action = f"agent/model/{decision['route']}"
+                        else:
+                            action = (
+                                f"agent/{'fixed' if fixed else 'original'}"
+                                if event.kind == "agent_wakeup"
+                                else EVENT_ACTIONS[event.kind]
+                            )
                         await click_world_action(
                             page,
                             f'button[data-action="{action}"]',
@@ -293,25 +416,47 @@ async def solari_future(
                         await read_world_trace(page),
                         future.events,
                         fixed=fixed,
+                        agent_mode=agent_mode,
+                        model_actions=[decision["route"] for decision in model_decisions],
                     )
                     observed["trace"] = trace
-                    parity = browser_simulator_parity(observed, trace, future.events, fixed=fixed)
+                    parity = browser_simulator_parity(
+                        observed,
+                        trace,
+                        future.events,
+                        fixed=fixed,
+                        agent_mode=agent_mode,
+                        model_decisions=model_decisions,
+                    )
                     violations = observed_violations(trace)
+                    agent_name = (
+                        "model_patched" if agent_mode == "model" and fixed
+                        else "model" if agent_mode == "model"
+                        else "fixed" if fixed else "original"
+                    )
                     result = {
                         "future_id": future.future_id,
                         "seed": future.seed,
                         "status": "PASS" if observed_invariant_holds(trace) else "FAIL",
-                        "agent": "fixed" if fixed else "original",
+                        "agent": agent_name,
+                        "agent_mode": agent_mode,
+                        "agent_evidence": model_agent.evidence(model_decisions)
+                        if model_agent else {
+                            "mode": "policy",
+                            "label": "DETERMINISTIC",
+                            "policy": "verify_payment_and_dispute_sources" if fixed else "trust_crm_only",
+                            "stochastic": False,
+                        },
                         "invariant": INVARIANT_ID,
                         "sandbox_id": sandbox.sandboxId,
                         "browser_session_id": browser_session_id,
                         "preview_url": preview_url,
-                        "input_hash": future_fingerprint(future.events),
+                        "input_hash": future_hash,
                         "violation": observed_violation(trace),
                         "violations": violations,
                         "failure_modes": sorted({item["type"] for item in violations}),
                         "boundaries": find_failure_boundaries(future.events),
-                        "counterfactual_proof": counterfactual_proof(future.events),
+                        "counterfactual_proof": proof,
                         "events": [event.as_dict() for event in future.events],
                         "search": {
                             "parent_future_id": future.parent_future_id,
@@ -322,6 +467,7 @@ async def solari_future(
                         "observed": observed,
                         "recording_keyframes": trace,
                         "browser_simulator_parity": parity,
+                        "exact_behavior_reproducible": agent_mode != "model",
                     }
                     await asyncio.sleep(2)
                 if recording_dir and browser_session_id:
@@ -356,6 +502,10 @@ async def solari_run(
     output: Path,
     concurrency: int = 1,
     max_environments: int = 20,
+    agent_mode: str = "policy",
+    model: str | None = None,
+    temperature: float = 0.2,
+    allow_untested_model: bool = False,
 ):
     if count < 1:
         raise SystemExit("--futures must be at least 1")
@@ -363,6 +513,10 @@ async def solari_run(
         raise SystemExit("--concurrency must be at least 1")
     if max_environments < 1:
         raise SystemExit("--max-environments must be at least 1")
+    if agent_mode not in {"policy", "model"}:
+        raise SystemExit("--agent must be policy or model")
+    if agent_mode == "policy" and (model or allow_untested_model):
+        raise SystemExit("--model and --allow-untested-model require --agent model")
     worst_case_environments = count * 2
     if worst_case_environments > max_environments:
         raise SystemExit(
@@ -370,6 +524,11 @@ async def solari_run(
             f"environments; raise --max-environments above {max_environments}"
         )
     cloud_api_key()
+    selected_model = select_model(model, allow_untested_model) if agent_mode == "model" else None
+    model_router = (
+        OpenRouterRouter(openrouter_api_key(), selected_model.model_id, temperature)
+        if selected_model else None
+    )
     started = perf_counter()
     search = coverage_guided_search(count, seed_start)
     recording_dir = output.parent / "replays"
@@ -378,9 +537,24 @@ async def solari_run(
     async def bounded_future(future, fixed=False):
         async with semaphore:
             try:
+                if agent_mode == "model":
+                    return await solari_future(
+                        future,
+                        fixed=fixed,
+                        recording_dir=recording_dir,
+                        agent_mode=agent_mode,
+                        model_router=model_router,
+                    )
                 return await solari_future(future, fixed=fixed, recording_dir=recording_dir)
             except Exception as error:
-                return cloud_error_result(future, fixed, error)
+                return cloud_error_result(
+                    future,
+                    fixed,
+                    error,
+                    agent_mode=agent_mode,
+                    model=selected_model.model_id if selected_model else None,
+                    temperature=temperature if selected_model else None,
+                )
 
     results = await asyncio.gather(*(bounded_future(future) for future in search.futures))
     failing = [
@@ -430,6 +604,8 @@ async def solari_run(
                 key: candidate[key]
                 for key in (
                     "agent",
+                    "agent_mode",
+                    "agent_evidence",
                     "status",
                     "input_hash",
                     "sandbox_id",
@@ -441,6 +617,7 @@ async def solari_run(
                     "recording_keyframes",
                     "observed",
                     "browser_simulator_parity",
+                    "exact_behavior_reproducible",
                     "error",
                 )
                 if key in candidate
@@ -464,6 +641,22 @@ async def solari_run(
     payload = {
         "run_id": f"solari-{seed_start}-{seed_start + count - 1}",
         "execution_mode": "solari",
+        "agent_config": (
+            {
+                "mode": "model",
+                "provider": "openrouter",
+                "requested_model": selected_model.model_id,
+                "active_model": model_router.active_model,
+                "temperature": temperature,
+                "stochastic": True,
+                "fallbacks": model_router.fallbacks,
+            }
+            if selected_model and model_router else {
+                "mode": "policy",
+                "label": "DETERMINISTIC",
+                "stochastic": False,
+            }
+        ),
         "started_at": datetime.now().astimezone().isoformat(),
         "futures": results,
         "summary": summary,

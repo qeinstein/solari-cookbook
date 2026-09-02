@@ -88,6 +88,11 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--olive-dark); ou
 .panel-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--ink); }
 .panel-head span { font: 600 15px var(--serif); letter-spacing: -.02em; }
 .panel-head small { color: var(--muted); font-size: 8px; letter-spacing: .09em; text-transform: uppercase; }
+.agent-evidence { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 12px 0 2px; padding: 8px 9px; border: 1px solid var(--rule); background: #f4f3ed; color: var(--muted); font-size: 8px; }
+.agent-evidence strong { color: var(--olive-dark); font-size: 8px; letter-spacing: .08em; }
+.agent-evidence.model { border-color: #c9d0c1; background: #f0f3ec; }
+.agent-evidence.model strong { color: #3c5b35; }
+.agent-evidence em { padding: 2px 4px; border-radius: 2px; background: #e7dfcb; color: #856a33; font-size: 7px; font-style: normal; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; }
 .execution-steps { position: relative; display: grid; gap: 0; margin: 17px 0 15px; padding: 0; list-style: none; }
 .execution-steps::before { position: absolute; top: 13px; bottom: 13px; left: 44px; width: 1px; background: var(--rule); content: ""; }
 .execution-step { position: relative; z-index: 1; display: grid; grid-template-columns: 24px 13px minmax(0, 1fr); gap: 8px; align-items: start; min-height: 47px; opacity: 0; animation: trace-in 460ms cubic-bezier(.22, 1, .36, 1) forwards; }
@@ -236,6 +241,7 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--olive-dark); ou
 .counterfactual-diff p { margin: 0; padding: 7px 8px; color: var(--muted); font-size: 8px; }
 .counterfactual-diff p.runtime-proof { border-top: 1px solid var(--rule); color: var(--olive-dark); font-weight: 650; }
 .counterfactual-diff p.runtime-error { border-top: 1px solid var(--rule); color: #9a6b24; font-weight: 650; }
+.counterfactual-diff p.model-warning { border-top: 1px solid var(--rule); color: #856a33; font-weight: 650; }
 .recording-card { margin: 0 0 3px; padding: 9px; border: 1px solid var(--rule); background: #f4f3ed; }
 .recording-head { display: flex; justify-content: space-between; color: var(--muted); font-size: 8px; letter-spacing: .08em; text-transform: uppercase; }
 .recording-head b { color: var(--ink); }

@@ -95,6 +95,16 @@ class Handler(BaseHTTPRequestHandler):
             if sent:
                 STATE["messages"].append("Your payment remains overdue.")
             STATE["trace"].append(snapshot("agent/fixed", sent=sent))
+        elif path in {"/agent/model/send", "/agent/model/suppress"}:
+            sent = path.endswith("/send")
+            if sent:
+                STATE["messages"].append("Your payment remains overdue.")
+            STATE["trace"].append(snapshot(
+                path.lstrip("/"),
+                sent=sent,
+                agent_mode="model",
+                model_action="send_reminder" if sent else "suppress",
+            ))
         else:
             self.send_body(b"not found", 404, "text/plain")
             return

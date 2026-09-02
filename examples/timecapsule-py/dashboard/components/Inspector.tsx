@@ -65,7 +65,7 @@ function BoundaryCard({
   );
 }
 
-function CounterfactualDiff({ proof }: { proof?: CounterfactualProof }) {
+function CounterfactualDiff({ proof, modelMode }: { proof?: CounterfactualProof; modelMode: boolean }) {
   if (!proof) return null;
   const runtimeError = proof.runtime?.status === "ERROR";
   return (
@@ -74,8 +74,8 @@ function CounterfactualDiff({ proof }: { proof?: CounterfactualProof }) {
       <div className="diff-row"><span>Environment</span><code>{shortHash(proof.original.environment_hash)}</code><strong>=</strong><code>{shortHash(proof.patched.environment_hash)}</code></div>
       <div className="diff-row"><span>Event input</span><code>{shortHash(proof.original.event_hash)}</code><strong>=</strong><code>{shortHash(proof.patched.event_hash)}</code></div>
       <div className="diff-row"><span>World assets</span><code>{shortHash(proof.original.world_asset_hash)}</code><strong>=</strong><code>{shortHash(proof.patched.world_asset_hash)}</code></div>
-      <div className="diff-row changed"><span>Policy</span><code>{proof.only_change.original}</code><strong>→</strong><code>{proof.only_change.patched}</code></div>
-      <p>All {proof.identical_fields.length} environment inputs match. Only the built-in policy changes.</p>
+      <div className="diff-row changed"><span>{modelMode ? "Instruction" : "Policy"}</span><code>{proof.only_change.original}</code><strong>→</strong><code>{proof.only_change.patched}</code></div>
+      <p className={modelMode ? "model-warning" : undefined}>{modelMode ? `All ${proof.identical_fields.length} environment inputs match. Model behavior is stochastic; identical future inputs do not guarantee identical actions.` : `All ${proof.identical_fields.length} environment inputs match. Only the built-in policy changes.`}</p>
       {runtimeError ? <p className="runtime-error">Patched replay returned ERROR · no counterfactual runtime verification was established.</p> : proof.runtime?.verified ? <p className="runtime-proof">Runtime verified · same input/environment · fresh sandbox and browser for patched replay.</p> : null}
     </div>
   );
@@ -123,6 +123,7 @@ export function Inspector({
   const events = action?.action === "minimize" && action.payload.minimal_events ? action.payload.minimal_events : future?.events ?? [];
   const violation = action?.action === "minimize" ? action.payload.minimal_violation : future?.violation;
   const proof = action?.payload.counterfactual_proof ?? future?.counterfactual_proof;
+  const modelMode = future?.agent_mode === "model" || future?.agent_evidence?.mode === "model";
   return (
     <aside className={`inspector ${future?.status === "PASS" ? "pass-inspector" : ""} ${executionError ? "error-inspector" : ""}`} aria-labelledby="inspector-title">
       <div className="inspector-kicker"><span>{executionError ? "Execution error" : future?.status === "FAIL" ? violation?.type.replaceAll("_", " ") : "Invariant held"}</span><span>{future?.future_id ?? "—"}</span></div>
@@ -143,8 +144,8 @@ export function Inspector({
       <div className="timeline-heading"><span>{action?.action === "minimize" ? "Minimized counterexample" : "Candidate future"}</span><b>{events.length} events</b></div>
       <Timeline events={events} violationAt={violation?.at} />
       {future?.status === "FAIL" ? <div className="proof-flow" id="evidence"><div><span>Original</span><strong className="fail">FAIL</strong></div><span>→</span><div><span>Minimize</span><strong>{action?.action === "minimize" ? `${action.payload.before_events}→${action.payload.events}` : "ready"}</strong></div><span>→</span><div><span>Patched</span><strong className="pass">{future.comparison?.patched ?? "—"}</strong></div></div> : null}
-      <CounterfactualDiff proof={proof} />
-      {future?.browser_simulator_parity?.verified ? <p className="runtime-proof">Browser and simulator agree on final state, message count, and failure class.</p> : null}
+      <CounterfactualDiff proof={proof} modelMode={modelMode} />
+      {future?.browser_simulator_parity?.verified ? <p className="runtime-proof">{modelMode ? "Browser and simulator agree on final temporal state; model action evidence is recorded separately." : "Browser and simulator agree on final state, message count, and failure class."}</p> : null}
       {future ? <RecordingEvidence future={future} /> : null}
     </aside>
   );

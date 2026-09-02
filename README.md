@@ -21,17 +21,18 @@ failure boundary; minimizes the counterexample; and replays the exact same
 future against a patched agent.
 
 This repository contains the complete product example: a deterministic Python
-engine, an isolated browser execution path, a Python API, and a polished
-Next.js dashboard. Start locally in seconds, inspect a concrete failure, then
-promote the minimized future into a regression fixture.
+engine, an isolated browser execution path, an optional OpenRouter model agent,
+a Python API, and a polished Next.js dashboard. Start locally in seconds,
+inspect a concrete failure, then promote the minimized future into a regression
+fixture.
 
 ### Scope, stated precisely
 
-The current implementation demonstrates this loop on one deterministic
-collections scenario, with one built-in original policy and one built-in patched
-policy. Its evidence proves that this candidate policy change fixes the
-discovered temporal failure. It is not an arbitrary-agent runner or a
-commit-level patch verifier.
+The current implementation demonstrates this loop on one collections scenario.
+Policy mode uses the built-in original and patched policies and is deterministic;
+model mode uses a curated OpenRouter model to choose each agent action and labels
+the resulting evidence as stochastic. The example does not claim support for
+arbitrary providers, arbitrary agent runtimes, or commit-level patch verification.
 
 ## See it in 90 seconds
 
@@ -70,7 +71,7 @@ state, so the run can be understood at a glance or screen-recorded for a demo.
 | **Inspect** | A future tree, ordered action trace, and causal state explain what happened. |
 | **Minimize** | Delta debugging finds the smallest timeline while preserving the selected failure class. |
 | **Locate** | Binary search identifies the first failing webhook delay at one-minute resolution. |
-| **Replay** | Original and patched policies receive the same canonical input fingerprint. |
+| **Replay** | Policy mode replays the same canonical input against the patch; model mode records the same future/environment fingerprints while making no exact behavioral reproducibility claim. |
 | **Regress** | A minimized counterexample becomes a checked-in JSON fixture. |
 
 ## The scenario
@@ -107,6 +108,11 @@ flowchart LR
   B --> M[Failure-class minimizer]
   M --> R[Replay exact input with patched policy]
   R --> X[Regression fixture]
+  O --> A[Agent interface]
+  A --> P[Deterministic policy]
+  A --> L[OpenRouter model]
+  P --> W1
+  L --> W1
 ```
 
 The search begins with deterministic seeds, then mutates payment delay,
@@ -132,6 +138,12 @@ or saved as JSON:
 - original/patched comparison with fresh runtime identifiers;
 - browser/simulator parity checks for state, messages, and violations;
 - replay recording keyframes when a recording is available.
+
+Model-mode futures additionally persist the OpenRouter model ID, temperature,
+prompt hash, observation hash, structured response, chosen action, future and
+environment fingerprints, and any free-model fallback. They are explicitly
+marked stochastic: identical future inputs do not guarantee identical model
+actions.
 
 The cloud path fails closed: incomplete traces, state disagreement, input
 drift, or a non-fresh counterfactual runtime cannot be reported as a trusted
@@ -177,6 +189,32 @@ npm ci --prefix dashboard
 python3 main.py cloud --futures 3 --concurrency 1 --max-environments 6 --output runs/cloud-latest.json
 python3 dashboard/dev.py --run runs/cloud-latest.json
 ```
+
+The default is `--agent policy`: deterministic, built-in, and free of model
+configuration. To run the same isolated futures through a model agent, choose
+from the terminal picker or pass a tested OpenRouter model explicitly:
+
+```bash
+export OPENROUTER_API_KEY=your_openrouter_key_here
+python3 main.py cloud --agent model
+python3 main.py cloud --agent model --model openai/gpt-5.4-mini
+```
+
+The picker keeps the tested catalogue intentionally small and puts free models
+first:
+
+```text
+1. FREE · Google Gemma 4 31B       google/gemma-4-31b-it:free
+2. FREE · Liquid LFM2.5 2.6B      liquid/lfm-2.5-2.6b:free
+3. FREE · MiniMax M3               minimax/minimax-m3:free
+4. PAID · OpenAI GPT-5.4 Mini      openai/gpt-5.4-mini
+5. PAID · Anthropic Claude Haiku 4.5  anthropic/claude-haiku-4.5
+```
+
+If `OPENROUTER_API_KEY` is absent, the CLI asks for it without writing it to
+disk. A rate-limited model falls through to the next available free model and
+the fallback is recorded in the run. Use `--allow-untested-model` only when
+you deliberately want to try a model outside the tested catalogue.
 
 Each future creates and destroys its own isolated world and browser pair. The
 JSON output includes the input fingerprint, violation snapshot, runtime IDs,

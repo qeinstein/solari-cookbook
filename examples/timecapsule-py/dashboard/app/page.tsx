@@ -51,6 +51,7 @@ export default function Dashboard() {
   const selected = futures.find((future) => future.future_id === selectedId) ?? futures[0];
   const failures = futures.filter((future) => future.status === "FAIL");
   const isSolari = data?.execution_mode === "solari";
+  const isModel = data?.agent_config?.mode === "model" || selected?.agent_mode === "model";
 
   function selectFuture(future: Future) {
     setSelectedId(future.future_id);
@@ -84,7 +85,7 @@ export default function Dashboard() {
           <a href="#evidence"><span className="nav-icon">⌁</span>Evidence</a>
           <a href="#coverage"><span className="nav-icon">◇</span>Coverage</a>
         </nav>
-        <div className="side-bottom"><div className="overline">Execution</div><p>{isSolari ? "Solari cloud isolation" : "Deterministic local proof"}</p><p>Coverage-guided mutation</p></div>
+        <div className="side-bottom"><div className="overline">Execution</div><p>{isModel ? "OpenRouter model agent" : isSolari ? "Solari cloud isolation" : "Deterministic local proof"}</p><p>Coverage-guided mutation</p></div>
       </aside>
 
       <div className="content">
@@ -98,7 +99,7 @@ export default function Dashboard() {
         </div>
 
         <section className="intro">
-          <div><div className="kicker">Coverage-guided temporal fuzzing</div><h1>Find the failure boundary.</h1><p>Mutate the collections workflow across time, preserve novel futures, and compare the exact input under the built-in original and patched policies.</p></div>
+          <div><div className="kicker">Coverage-guided temporal fuzzing</div><h1>Find the failure boundary.</h1><p>{isModel ? "Mutate the collections workflow across time, preserve novel futures, and record each OpenRouter decision against the same isolated world." : "Mutate the collections workflow across time, preserve novel futures, and compare the exact input under the built-in original and patched policies."}</p></div>
           <div className="run-info">Latest exploration<strong>{loading ? "Loading saved run…" : data?.run_id ?? "No saved run"}</strong></div>
         </section>
 

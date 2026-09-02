@@ -84,7 +84,7 @@ class World:
         self.trace.append({"at": event.at.isoformat(), "event": event.as_dict()})
 
 
-class CollectionsAgent:
+class PolicyAgent:
     def __init__(self, verify_payment_before_contact=False):
         self.verify_payment_before_contact = verify_payment_before_contact
 
@@ -113,6 +113,12 @@ class CollectionsAgent:
             "dispute_webhook_scheduled": world.dispute_webhook_scheduled,
         })
         world.trace.append({"at": world.now.isoformat(), "agent": "sent_overdue_reminder"})
+
+
+# Kept as a compatibility name for the deterministic local proof and saved
+# regression fixtures. New cloud code refers to the implementation as the
+# PolicyAgent so the model-backed sibling is explicit.
+CollectionsAgent = PolicyAgent
 
 
 def run_future(events: list[Event], agent: CollectionsAgent) -> World:
@@ -225,7 +231,7 @@ def future_fingerprint(events: list[Event]) -> str:
 def observed_violations(trace: list[dict[str, Any]]) -> list[dict[str, Any]]:
     violations = []
     for item in trace:
-        if item.get("action") not in {"agent/original", "agent/fixed"} or not item.get("sent"):
+        if not str(item.get("action", "")).startswith("agent/") or not item.get("sent"):
             continue
         if (
             item.get("payment") == "paid"

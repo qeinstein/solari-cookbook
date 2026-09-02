@@ -236,6 +236,8 @@ class ProductLoopTests(unittest.TestCase):
         self.assertIn("Observable actions + evidence", replay.read_text())
         self.assertIn("Browser evidence replay", replay.read_text())
         self.assertIn("not hidden chain-of-thought", replay.read_text())
+        self.assertIn("MODEL:", replay.read_text())
+        self.assertIn("stochastic", replay.read_text())
         self.assertIn("actionError && selected && actionError.futureId === selected.future_id", page.read_text())
 
     def test_public_claims_are_scoped_to_the_implemented_scenario(self):
@@ -245,11 +247,13 @@ class ProductLoopTests(unittest.TestCase):
             text = path.read_text().lower()
             self.assertIn("current implementation demonstrates", text)
             self.assertIn("built-in original", text)
-            self.assertIn("not an arbitrary-agent runner", text)
+            self.assertIn("optional openrouter model agent", text)
+            self.assertIn("model mode", text)
+            self.assertIn("stochastic", text)
             self.assertIn("npm ci --prefix dashboard", text)
             self.assertIn("demo/solari-canonical.json", text)
             self.assertNotIn("your ai agent fails", text)
-            self.assertNotIn("any agent", text)
+            self.assertNotIn("any provider", text)
             self.assertNotIn("before deploying your agents", text)
 
         dashboard = (EXAMPLE_ROOT / "dashboard/app/page.tsx").read_text()
