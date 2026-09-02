@@ -1,110 +1,193 @@
-# Solari Cookbook
+# TimeCapsule
 
-[![TimeCapsule checks](https://img.shields.io/github/actions/workflow/status/qeinstein/solari-cookbook/timecapsule.yml?branch=main&style=flat-square&label=TimeCapsule%20checks)](https://github.com/qeinstein/solari-cookbook/actions/workflows/timecapsule.yml) [![MIT License](https://img.shields.io/github/license/qeinstein/solari-cookbook?style=flat-square)](LICENSE)
+<p align="center">
+  <img src="examples/timecapsule-py/assets/timecapsule-banner.svg" alt="TimeCapsule — find the failure boundary" width="1200">
+</p>
 
-Short, runnable examples for [Solari](https://getsolari.com) — cloud browsers,
-sandboxes, and desktops behind one API key.
+<p align="center"><strong>Temporal reliability testing for AI agents.</strong><br>Explore alternate futures, isolate the ones that break, and replay the same input against a patch.</p>
 
-Every example in this repo is a complete program you can run in under a minute.
-They are deliberately small: one idea each, no framework, no scaffolding to read
-past. Copy one into your project and change the parts you care about.
+<p align="center">
+  <a href="actions/workflows/timecapsule.yml"><img src="actions/workflows/timecapsule.yml/badge.svg?branch=main" alt="Checks"></a>
+  <a href="https://nextjs.org/docs/app"><img src="https://img.shields.io/badge/frontend-Next.js%20App%20Router-111111?style=flat-square&logo=nextdotjs&logoColor=white" alt="Next.js App Router"></a>
+  <a href="https://www.python.org/"><img src="https://img.shields.io/badge/backend-Python%20API-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python API"></a>
+  <img src="https://img.shields.io/badge/license-MIT-687158?style=flat-square" alt="MIT license">
+</p>
 
-## Featured example: TimeCapsule
+> Find the futures where your AI agent fails before your users do.
 
-[![Explore TimeCapsule](https://img.shields.io/badge/Explore-TimeCapsule-687158?style=for-the-badge)](examples/timecapsule-py)
+TimeCapsule treats the future as a fuzzing surface. It explores payment,
+dispute, webhook, and wakeup timelines; checks a safety invariant; finds the
+failure boundary; minimizes the counterexample; and replays the exact same
+future against a patched agent.
 
-[TimeCapsule](examples/timecapsule-py) explores long-running agent futures: each
-future gets an isolated Solari sandbox and recorded cloud browser, failures are
-minimized into reproducible event sequences, and the same future is replayed
-against a patched agent. The [TimeCapsule README](examples/timecapsule-py/README.md)
-contains a 90-second demo path, architecture, verified checks, and the real
-Solari command.
+This repository contains the complete product example: a deterministic Python
+engine, an isolated browser execution path, a Python API, and a polished
+Next.js dashboard. Start locally in seconds, inspect a concrete failure, then
+promote the minimized future into a regression fixture.
 
-## Examples
-
-### TimeCapsule
-
-| Example | Language | What it shows |
-| --- | --- | --- |
-| [timecapsule-py](examples/timecapsule-py) | Python | Explore isolated, branching agent futures with Solari browser + sandbox sessions |
-
-### Cloud browser
-
-| Example | Language | What it shows |
-| --- | --- | --- |
-| [browser-quickstart-ts](examples/browser-quickstart-ts) | TypeScript | Launch a browser, open a page, read it |
-| [browser-quickstart-py](examples/browser-quickstart-py) | Python | Launch a browser, open a page, read it |
-| [browser-stealth-proxy-ts](examples/browser-stealth-proxy-ts) | TypeScript | Stealth mode + residential proxy egress |
-| [browser-profiles-ts](examples/browser-profiles-ts) | TypeScript | Log in once, reuse the session forever |
-| [browser-session-recording-py](examples/browser-session-recording-py) | Python | Record a session, download the replay |
-
-### Sandbox
-
-| Example | Language | What it shows |
-| --- | --- | --- |
-| [sandbox-quickstart-ts](examples/sandbox-quickstart-ts) | TypeScript | Run a command, write and read files |
-| [sandbox-code-interpreter-py](examples/sandbox-code-interpreter-py) | Python | Stateful Python kernel for agent loops |
-| [sandbox-port-preview-ts](examples/sandbox-port-preview-ts) | TypeScript | Expose a server in the VM on a public URL |
-
-### Desktop
-
-| Example | Language | What it shows |
-| --- | --- | --- |
-| [desktop-computer-use-py](examples/desktop-computer-use-py) | Python | Screenshot, click, and type on a Linux GUI |
-
-## Running an example
-
-Each directory is self-contained.
+## See it in 90 seconds
 
 ```bash
 git clone https://github.com/qeinstein/solari-cookbook.git
-cd solari-cookbook/examples/browser-quickstart-ts
-
-npm install                          # or: pip install -r requirements.txt
-export SOLARI_API_KEY=slr_live_...   # grab one at console.getsolari.com
-npm start                            # or: python main.py
+cd solari-cookbook/examples/timecapsule-py
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python3 main.py run --futures 25
+python3 dashboard/dev.py
 ```
 
-One `slr_live_` key works across browsers, sandboxes, and desktops, and every
-product bills to the same balance.
+Open [http://127.0.0.1:3000](http://127.0.0.1:3000), then:
 
-## Which product do I want?
+1. Open a red branch and inspect the contradiction: payment `PAID`, CRM
+   `OVERDUE`, agent belief `OVERDUE`.
+2. Click **Minimize** to collapse it to a three-event counterexample while
+   preserving the failure class.
+3. Read the **failure boundary**, narrowed to the first failing minute.
+4. Click **Replay exact input** and watch original `FAIL` become patched `PASS`
+   without changing the event fingerprint.
+5. Select a green branch to inspect a safe future too.
 
-- **Cloud browser** — you need a *web page*: scraping, testing, filling forms,
-  anything Playwright or Puppeteer would do locally. Adds stealth, managed
-  proxies, captcha solving, profiles, and session recording.
-- **Sandbox** — you need to *run code*: an LLM's Python, an untrusted build, a
-  data job. A headless microVM that boots from a snapshot in about a second.
-- **Desktop** — you need a *screen*: computer-use agents, GUI apps, anything
-  that has to be clicked. A sandbox plus X11 and a live VNC stream.
+That is the product loop: **FAIL → MINIMIZE → PATCHED PASS**, with the input and
+causal state visible rather than implied.
 
-## Gotchas the examples encode
+## The product loop
 
-Things that cost you an afternoon if you meet them cold:
+| Stage | What TimeCapsule proves |
+| --- | --- |
+| **Explore** | Deterministic seeds and coverage-guided mutations reach diverse temporal states. |
+| **Inspect** | A future tree, ordered action trace, and causal state explain what happened. |
+| **Minimize** | Delta debugging finds the smallest timeline while preserving the selected failure class. |
+| **Locate** | Binary search identifies the first failing webhook delay at one-minute resolution. |
+| **Replay** | Original and patched policies receive the same canonical input fingerprint. |
+| **Regress** | A minimized counterexample becomes a checked-in JSON fixture. |
 
-- **TypeScript: call `await solari.close()`.** The browser client keeps a
-  loopback proxy open for connection retries. Skip the close and your script
-  prints its output and then hangs forever instead of exiting.
-- **Recording is per session, not per account.** Pass `recording: true` when you
-  create the session; without it the replay endpoint 404s forever. The upload is
-  async after release, so poll for ~30s before giving up.
-- **Sandbox commands are not shell-interpreted.** `run("ls -la")` looks for a
-  binary named `ls -la`. Put argv in `args`, or run `sh -c` explicitly.
-- **`kill()`, not `close()`, ends a VM.** `close()` drops your local control
-  channel; the VM keeps running until its idle timeout.
-- **`timeoutMs` is a rolling idle window**, not a hard deadline — it resets on
-  every use.
+## The scenario
 
-## Links
+The vulnerable collections agent trusts stale CRM records. A customer payment
+updates the payment system immediately, but the payment webhook arrives later.
+Separately, a dispute can be open in the dispute service while its CRM mirror
+is still unaware. If the agent wakes during either interval, it sends an
+incorrect overdue reminder.
 
-- Docs — [docs.getsolari.com](https://docs.getsolari.com)
-- Console — [console.getsolari.com](https://console.getsolari.com)
-- Changelog — [changelog.getsolari.com](https://changelog.getsolari.com)
-- Questions — [hello@getsolari.com](mailto:hello@getsolari.com)
+The patched policy verifies the payment source before contacting the customer.
+TimeCapsule makes the race explicit and checks this invariant:
 
-## Contributing
+```text
+no_contact_while_external_state_is_stale
+```
 
-New examples are welcome. Keep them small, make them run end-to-end against the
-real API, and put anything surprising in a comment right where it bites.
+The same pattern applies to support entitlements, billing state, deploy
+rollbacks, incident acknowledgements, and any workflow where an agent acts
+while state is propagating across systems and time.
+
+## Architecture
+
+```mermaid
+flowchart LR
+  G[Temporal mutator] --> O[TimeCapsule engine]
+  O --> W1[Isolated world A]
+  O --> W2[Isolated world B]
+  W1 --> T[Observed action trace]
+  W2 --> T
+  T --> I{Invariant holds?}
+  I -- no --> B[Binary-search boundary]
+  B --> M[Failure-class minimizer]
+  M --> R[Replay exact input with patched policy]
+  R --> X[Regression fixture]
+```
+
+The search begins with deterministic seeds, then mutates payment delay,
+dispute timing, webhook delay, and wakeup placement. A candidate is retained
+when it contributes novel event kinds, adjacent event pairs, temporal windows,
+delay buckets, wakeup counts, or failure signatures. Selected futures form a
+parent/child tree with a recorded shared event prefix.
+
+Every run binds its ordered event input with a SHA-256 fingerprint. The
+counterfactual replay checks the same input, world contract, asset hash,
+fixture, and initial state while changing only the policy under test.
+
+## Evidence you can inspect
+
+Every failing future carries evidence that can be inspected in the dashboard
+or saved as JSON:
+
+- canonical event input and its SHA-256 fingerprint;
+- ordered browser action trace with state captured at every event boundary;
+- final state, sent-message count, invariant result, and failure class;
+- last passing and first failing delay for each searchable boundary;
+- mutation parent, operator, novel coverage, and shared event prefix;
+- original/patched comparison with fresh runtime identifiers;
+- browser/simulator parity checks for state, messages, and violations;
+- replay recording keyframes when a recording is available.
+
+The cloud path fails closed: incomplete traces, state disagreement, input
+drift, or a non-fresh counterfactual runtime cannot be reported as a trusted
+PASS.
+
+## Search benchmark
+
+The benchmark is part of the evidence, not a marketing claim. Across 200
+paired seeds, both strategies received exactly 128 unique candidate
+evaluations per trial:
+
+| Strategy | Unique behaviors p25 / median / p75 | Rare hit rate | First rare failure p25 / median / p75 (hits) |
+| --- | ---: | ---: | ---: |
+| Random mutation | 92 / 95 / 98 | 86.5% | 12 / 29 / 53 |
+| Coverage-guided | 97 / 99 / 103 | 91.0% | 12 / 30.5 / 61 |
+
+Guidance won the paired breadth comparison 151–42, with 7 ties. For the rare
+failure's first appearance, random won 58 pairs, guidance won 55, and 49 tied
+among the 162 pairs where both found it. The honest conclusion is that
+coverage guidance broadens the explored surface and slightly raises rare-target
+hit rate, but this run does not prove that it finds rare failures faster.
+
+See the full [search comparison report](benchmarks/timecapsule-search-comparison.md)
+for the protocol, distributions, and limitations.
+
+## Optional cloud execution
+
+Local proof and deterministic tests work without an account or API key. Keep
+the credential server-side and never commit it or expose it to the browser:
+
+```bash
+cd examples/timecapsule-py
+source .venv/bin/activate
+export TIMECAPSULE_CLOUD_KEY=your_key_here
+python3 main.py cloud --futures 3 --concurrency 1 --output runs/cloud-latest.json
+python3 dashboard/dev.py --run runs/cloud-latest.json
+```
+
+Each future creates and destroys its own isolated world and browser pair. The
+JSON output includes the input fingerprint, violation snapshot, runtime IDs,
+preview URL, observed action trace, recording status, and original/patched
+evidence. `--concurrency 1` is the safe default for a new or low-limit account.
+
+## Documentation and layout
+
+The [full TimeCapsule guide](examples/timecapsule-py/README.md) contains the
+dashboard API routes, command-line replay workflow, verification commands,
+recording behavior, and the honest production boundary.
+
+```text
+├── examples/timecapsule-py/
+│   ├── assets/             # Product banner and static visual assets
+│   ├── dashboard/          # Next.js App Router frontend + Python API
+│   ├── regressions/        # Minimized, checked-in failure futures
+│   ├── timecapsule/        # Deterministic engine and execution adapters
+│   ├── world/              # Browser-drivable temporal world
+│   └── tests/              # Product-loop and API checks
+├── benchmarks/             # Reproducible search comparison report
+└── .github/workflows/       # Backend and frontend CI
+```
+
+## Honest production boundary
+
+This is a verified technical submission and single-operator demo, not a
+multi-tenant hosted service. Before putting untrusted users behind it, add
+durable run storage, authentication and per-user isolation, a background job
+queue, structured logs and metrics, secret management, recording retention,
+credentialed browser smoke tests, runtime-limit awareness, and explicit
+artifact versioning.
 
 MIT licensed.
