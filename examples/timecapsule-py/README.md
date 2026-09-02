@@ -70,6 +70,9 @@ Open [http://127.0.0.1:3000](http://127.0.0.1:3000), then:
 That is the core product loop: **FAIL → MINIMIZE → PATCHED PASS**, with the
 input and causal state visible rather than implied.
 
+The **Replay theatre** keeps the observable policy path beside the browser
+state, so the run can be understood at a glance or screen-recorded for a demo.
+
 ## The scenario
 
 The vulnerable collections agent trusts stale CRM records. A customer payment
