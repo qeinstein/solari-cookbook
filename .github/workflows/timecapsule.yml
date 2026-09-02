@@ -4,10 +4,12 @@ on:
   push:
     branches: [main]
     paths:
+      - "README.md"
       - "examples/timecapsule-py/**"
       - ".github/workflows/timecapsule.yml"
   pull_request:
     paths:
+      - "README.md"
       - "examples/timecapsule-py/**"
       - ".github/workflows/timecapsule.yml"
 
