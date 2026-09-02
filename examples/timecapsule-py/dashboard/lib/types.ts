@@ -106,6 +106,7 @@ export type Future = {
   future_id: string;
   seed: number;
   status: FutureStatus;
+  agent?: string;
   invariant?: string;
   input_hash?: string;
   violation?: ViolationSnapshot | null;
@@ -117,6 +118,8 @@ export type Future = {
   events: TimeEvent[];
   payment_status?: string;
   invoice_status?: string;
+  dispute_status?: string;
+  crm_dispute_status?: string;
   messages?: Array<Record<string, unknown>>;
   observed?: ObservedState;
   browser_simulator_parity?: BrowserSimulatorParity;
@@ -126,6 +129,7 @@ export type Future = {
   recording_path?: string;
   recording_events?: number;
   recording_keyframes?: Array<Record<string, unknown>>;
+  preview_url?: string;
   search?: {
     parent_future_id?: string | null;
     mutation?: string;

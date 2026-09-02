@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { FutureTree } from "../components/FutureTree";
+import { ExecutionTrace } from "../components/ExecutionTrace";
 import { Inspector, type FutureAction, type SelectedAction } from "../components/Inspector";
 import { RunSummary } from "../components/RunSummary";
 import { ApiError, fetchRun, postFutureAction } from "../lib/api";
@@ -79,6 +80,7 @@ export default function Dashboard() {
         <div className="overline">Workspace</div>
         <nav className="nav">
           <a className="active" href="#future-tree"><span className="nav-icon">◌</span>Future tree</a>
+          <a href="#replay"><span className="nav-icon">▷</span>Replay</a>
           <a href="#evidence"><span className="nav-icon">⌁</span>Evidence</a>
           <a href="#coverage"><span className="nav-icon">◇</span>Coverage</a>
         </nav>
@@ -99,6 +101,8 @@ export default function Dashboard() {
           <div><div className="kicker">Coverage-guided temporal fuzzing</div><h1>Find the failure boundary.</h1><p>Mutate the collections workflow across time, preserve novel futures, and compare the exact input under the built-in original and patched policies.</p></div>
           <div className="run-info">Latest exploration<strong>{loading ? "Loading saved run…" : data?.run_id ?? "No saved run"}</strong></div>
         </section>
+
+        <ExecutionTrace future={selected} isCloud={isSolari} />
 
         <div className="workspace" id="future-tree">
           <section aria-labelledby="future-tree-title">

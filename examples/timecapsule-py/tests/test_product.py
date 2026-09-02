@@ -226,11 +226,15 @@ class ProductLoopTests(unittest.TestCase):
         page = Path(__file__).parents[1] / "dashboard/app/page.tsx"
         inspector = Path(__file__).parents[1] / "dashboard/components/Inspector.tsx"
         tree = Path(__file__).parents[1] / "dashboard/components/FutureTree.tsx"
+        replay = Path(__file__).parents[1] / "dashboard/components/ExecutionTrace.tsx"
         self.assertIn("Agent belief", inspector.read_text())
         self.assertIn("Same future manifest", inspector.read_text())
         self.assertIn("fresh sandbox and browser for patched replay", inspector.read_text())
         self.assertIn("parent_future_id", tree.read_text())
         self.assertIn('className="docs-link"', page.read_text())
+        self.assertIn("Observable decision path", replay.read_text())
+        self.assertIn("Browser evidence replay", replay.read_text())
+        self.assertIn("not hidden chain-of-thought", replay.read_text())
         self.assertIn("actionError && selected && actionError.futureId === selected.future_id", page.read_text())
 
     def test_public_claims_are_scoped_to_the_implemented_scenario(self):
