@@ -94,7 +94,7 @@ export function ExecutionTrace({ future, isCloud }: { future?: Future; isCloud: 
 
       <div className="replay-grid">
         <div className="logic-panel">
-          <div className="panel-head"><span>Agent logic</span><small>Observable decision path</small></div>
+          <div className="panel-head"><span>Execution path</span><small>Observable actions + evidence</small></div>
           <ol className="execution-steps">
             {steps.map((step, index) => (
               <li className={`execution-step ${step.state}`} key={step.title} style={{ animationDelay: `${index * 70}ms` }}>
