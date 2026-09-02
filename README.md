@@ -4,7 +4,7 @@
   <img src="examples/timecapsule-py/assets/timecapsule-banner.svg" alt="TimeCapsule — find the failure boundary" width="1200">
 </p>
 
-<p align="center"><strong>Temporal reliability testing for AI agents.</strong><br>Explore alternate futures, isolate the ones that break, and replay the same input against a patch.</p>
+<p align="center"><strong>Temporal reliability for stateful agent workflows.</strong><br>Explore alternate futures, isolate the ones that break, and replay the same input against a patch.</p>
 
 <p align="center">
   <a href="actions/workflows/timecapsule.yml"><img src="actions/workflows/timecapsule.yml/badge.svg?branch=main" alt="Checks"></a>
@@ -13,7 +13,7 @@
   <img src="https://img.shields.io/badge/license-MIT-687158?style=flat-square" alt="MIT license">
 </p>
 
-> Find the futures where your AI agent fails before your users do.
+> Find the futures where the collections policy fails before your users do.
 
 TimeCapsule treats the future as a fuzzing surface. It explores payment,
 dispute, webhook, and wakeup timelines; checks a safety invariant; finds the
@@ -24,6 +24,14 @@ This repository contains the complete product example: a deterministic Python
 engine, an isolated browser execution path, a Python API, and a polished
 Next.js dashboard. Start locally in seconds, inspect a concrete failure, then
 promote the minimized future into a regression fixture.
+
+### Scope, stated precisely
+
+The current implementation demonstrates this loop on one deterministic
+collections scenario, with one built-in original policy and one built-in patched
+policy. Its evidence proves that this candidate policy change fixes the
+discovered temporal failure. It is not an arbitrary-agent runner or a
+commit-level patch verifier.
 
 ## See it in 90 seconds
 
@@ -77,9 +85,10 @@ TimeCapsule makes the race explicit and checks this invariant:
 no_contact_while_external_state_is_stale
 ```
 
-The same pattern applies to support entitlements, billing state, deploy
-rollbacks, incident acknowledgements, and any workflow where an agent acts
-while state is propagating across systems and time.
+The design is intended to extend to support entitlements, billing state, deploy
+rollbacks, incident acknowledgements, and other workflows where an agent acts
+while state is propagating across systems and time. Those extensions are not
+implemented in this example.
 
 ## Architecture
 
@@ -124,6 +133,8 @@ or saved as JSON:
 The cloud path fails closed: incomplete traces, state disagreement, input
 drift, or a non-fresh counterfactual runtime cannot be reported as a trusted
 PASS.
+An `ERROR` means the environment did not complete; it is neither a failed
+invariant nor a passing replay, and the partial run remains persisted.
 
 ## Search benchmark
 
@@ -154,7 +165,7 @@ the credential server-side and never commit it or expose it to the browser:
 cd examples/timecapsule-py
 source .venv/bin/activate
 export TIMECAPSULE_CLOUD_KEY=your_key_here
-python3 main.py cloud --futures 3 --concurrency 1 --output runs/cloud-latest.json
+python3 main.py cloud --futures 3 --concurrency 1 --max-environments 6 --output runs/cloud-latest.json
 python3 dashboard/dev.py --run runs/cloud-latest.json
 ```
 
@@ -162,6 +173,9 @@ Each future creates and destroys its own isolated world and browser pair. The
 JSON output includes the input fingerprint, violation snapshot, runtime IDs,
 preview URL, observed action trace, recording status, and original/patched
 evidence. `--concurrency 1` is the safe default for a new or low-limit account.
+The environment ceiling is checked before any remote resource is created; the
+worst-case cost is two environments per future because only original failures
+receive a patched replay.
 
 ## Documentation and layout
 
