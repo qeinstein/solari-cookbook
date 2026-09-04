@@ -76,7 +76,7 @@ Copy the repository’s `.env.example` to `.env`, fill in `SOLARI_API_KEY` (or
 `TIMECAPSULE_CLOUD_KEY`) and `OPENROUTER_API_KEY`, then run this single command:
 
 ```bash
-cp ../../.env.example ../../.env
+test -f ../../.env || cp ../../.env.example ../../.env
 # edit ../../.env with your keys
 python3 demo.py --cloud
 ```

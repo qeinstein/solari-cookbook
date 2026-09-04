@@ -194,7 +194,7 @@ run:
 
 ```bash
 cd examples/timecapsule-py
-cp ../../.env.example ../../.env
+test -f ../../.env || cp ../../.env.example ../../.env
 # edit ../../.env with your keys
 python3 demo.py --cloud
 ```
