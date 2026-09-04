@@ -188,12 +188,14 @@ python3 demo.py
 Open [http://127.0.0.1:3000](http://127.0.0.1:3000). This opens the checked-in
 proof and does not need an account or API key.
 
-For a fresh, real cloud-backed model run, put `SOLARI_API_KEY` (or
-`TIMECAPSULE_CLOUD_KEY`) and `OPENROUTER_API_KEY` in the repository root
-`.env`, then run:
+For a fresh, real cloud-backed model run, copy `.env.example` to `.env`, fill
+in `SOLARI_API_KEY` (or `TIMECAPSULE_CLOUD_KEY`) and `OPENROUTER_API_KEY`, then
+run:
 
 ```bash
 cd examples/timecapsule-py
+cp ../../.env.example ../../.env
+# edit ../../.env with your keys
 python3 demo.py --cloud
 ```
 

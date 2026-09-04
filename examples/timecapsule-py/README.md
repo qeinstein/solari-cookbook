@@ -72,10 +72,12 @@ state, so the run can be understood at a glance or screen-recorded for a demo.
 
 ### Real cloud demo
 
-Put `SOLARI_API_KEY` (or `TIMECAPSULE_CLOUD_KEY`) and `OPENROUTER_API_KEY` in
-the repository root `.env`, then run this single command:
+Copy the repository’s `.env.example` to `.env`, fill in `SOLARI_API_KEY` (or
+`TIMECAPSULE_CLOUD_KEY`) and `OPENROUTER_API_KEY`, then run this single command:
 
 ```bash
+cp ../../.env.example ../../.env
+# edit ../../.env with your keys
 python3 demo.py --cloud
 ```
 
