@@ -44,15 +44,12 @@ arbitrary providers, arbitrary agent runtimes, or commit-level patch verificatio
 | **Replay** | Policy mode replays the same canonical input against the patch; model mode records the same future/environment fingerprints while making no exact behavioral reproducibility claim. |
 | **Regress** | A minimized counterexample becomes a checked-in JSON fixture. |
 
-## 90-second demo
+## One-command demo
+
+After installing the dependencies once, start the backend and frontend together:
 
 ```bash
-cd examples/timecapsule-py
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-npm ci --prefix dashboard
-python3 dashboard/dev.py --run demo/solari-canonical.json
+python3 demo.py
 ```
 
 Open [http://127.0.0.1:3000](http://127.0.0.1:3000), then:
@@ -72,6 +69,21 @@ input and causal state visible rather than implied.
 
 The **Replay theatre** keeps the observable policy path beside the browser
 state, so the run can be understood at a glance or screen-recorded for a demo.
+
+### Real cloud demo
+
+Put `SOLARI_API_KEY` (or `TIMECAPSULE_CLOUD_KEY`) and `OPENROUTER_API_KEY` in
+the repository root `.env`, then run this single command:
+
+```bash
+python3 demo.py --cloud
+```
+
+It runs one real model-backed Solari future, saves the cloud evidence, and
+starts the API and frontend against that result. The defaults are deliberately
+small (`--futures 1`, `--concurrency 1`, and `--max-environments 2`) so the
+first live run is easy to inspect and keeps resource use bounded. Add
+`--agent policy` when you want a deterministic Solari control run.
 
 The checked-in [canonical cloud run](demo/solari-canonical.json) contains a
 safe branch, payment-staleness and dispute-contact failures, two patched passes,
@@ -276,6 +288,9 @@ these dashboard actions:
 Cloud mode is optional. Local proof and all deterministic tests work without
 an account or API key. Keep the credential server-side and never commit it or
 expose it to the browser:
+
+For the normal demo, use `python3 demo.py --cloud`. The lower-level command is
+useful when you need to control every cloud-run parameter:
 
 ```bash
 cd examples/timecapsule-py

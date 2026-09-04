@@ -43,7 +43,7 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 npm ci --prefix dashboard
-python3 dashboard/dev.py --run demo/solari-canonical.json
+python3 demo.py
 ```
 
 Open [http://127.0.0.1:3000](http://127.0.0.1:3000), then:
@@ -176,19 +176,37 @@ contains a safe branch, payment-staleness and dispute-contact failures, two
 patched passes, and five recorded browser replays. It opens without a cloud key
 so the complete evidence path is immediately reviewable from a fresh clone.
 
+## One-command demo
+
+After the one-time install, the API and frontend start together:
+
+```bash
+cd examples/timecapsule-py
+python3 demo.py
+```
+
+Open [http://127.0.0.1:3000](http://127.0.0.1:3000). This opens the checked-in
+proof and does not need an account or API key.
+
+For a fresh, real cloud-backed model run, put `SOLARI_API_KEY` (or
+`TIMECAPSULE_CLOUD_KEY`) and `OPENROUTER_API_KEY` in the repository root
+`.env`, then run:
+
+```bash
+cd examples/timecapsule-py
+python3 demo.py --cloud
+```
+
+The command waits for the real Solari run, saves its evidence, and then starts
+the API and frontend against that new artifact. Use `Ctrl-C` to stop both.
+
 ## Optional cloud execution
 
 Local proof and deterministic tests work without an account or API key. Keep
 the credential server-side and never commit it or expose it to the browser:
 
-```bash
-cd examples/timecapsule-py
-source .venv/bin/activate
-export TIMECAPSULE_CLOUD_KEY=your_key_here
-npm ci --prefix dashboard
-python3 main.py cloud --futures 3 --concurrency 1 --max-environments 6 --output runs/cloud-latest.json
-python3 dashboard/dev.py --run runs/cloud-latest.json
-```
+The lower-level commands remain available when you need custom run parameters.
+For the normal live demo, use `python3 demo.py --cloud` above.
 
 The default is `--agent policy`: deterministic, built-in, and free of model
 configuration. To run the same isolated futures through a model agent, choose
