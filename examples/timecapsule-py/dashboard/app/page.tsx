@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { FutureTree } from "../components/FutureTree";
 import { ExecutionTrace } from "../components/ExecutionTrace";
@@ -80,10 +81,10 @@ export default function Dashboard() {
         <div className="brand"><div className="mark">TC</div><div className="brand-name">TimeCapsule</div></div>
         <div className="overline">Workspace</div>
         <nav className="nav">
-          <a className="active" href="#future-tree"><span className="nav-icon">01</span>Future tree</a>
-          <a href="#replay"><span className="nav-icon">02</span>Replay theatre</a>
-          <a href="#evidence"><span className="nav-icon">03</span>Evidence</a>
-          <a href="#coverage"><span className="nav-icon">04</span>Coverage</a>
+          <Link className="active" aria-current="location" href="/"><span className="nav-icon">01</span>Future tree</Link>
+          <Link href="/"><span className="nav-icon">02</span>Replay theatre</Link>
+          <Link href="/"><span className="nav-icon">03</span>Evidence</Link>
+          <Link href="/"><span className="nav-icon">04</span>Coverage</Link>
         </nav>
         <div className="side-bottom">
           <div className="overline">Execution mode</div>
